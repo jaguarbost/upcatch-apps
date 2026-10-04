@@ -1,0 +1,31 @@
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
+
+# Environment variables
+.env*.local
+
+# Common ignores
+node_modules
+.next/
+.DS_Store
+# Local credentials and generated type artifacts
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Capacitor native build output and local machine settings
+android/.gradle/
+android/.idea/
+android/build/
+android/app/build/
+android/local.properties
+ios/DerivedData/
+ios/App/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/

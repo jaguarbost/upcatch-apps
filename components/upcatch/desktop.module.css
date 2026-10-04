@@ -1,0 +1,11 @@
+/* Make room for the top-right alert button alongside the journey header. */
+.app :global(.uc-journey-header) { right: 5rem; }
+/* Desktop adaptation only; mobile mockup geometry stays unchanged. */
+@media (min-width: 1024px) {
+  .app:not(:has(:global(.uc-landing))) { max-width: none; }
+  .app :global(.uc-map-panel) { left: 50%; right: auto; width: 440px; max-width: calc(100% - 3rem); padding: 0; transform: translateX(-50%); }
+  .app :global(.uc-create-panel) { left: 1.5rem; right: auto; top: 1.5rem; bottom: 6.5rem; width: 480px; border-radius: 2rem; overflow: hidden; box-shadow: 0 12px 40px rgb(14 23 38 / .2); }
+  .app :global(.uc-journey-panel) { left: 50%; right: auto; bottom: 6.5rem; width: 520px; max-width: calc(100% - 3rem); border-radius: 2rem; overflow: hidden; transform: translateX(-50%); }
+  .app :global(.uc-journey-header) { left: 50%; right: auto; width: 520px; max-width: calc(100% - 3rem); transform: translateX(-50%); }
+  .app :global(nav[aria-label="Primary"]) { left: 50%; right: auto; width: 540px; transform: translateX(-50%); }
+}
