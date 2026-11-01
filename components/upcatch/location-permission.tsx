@@ -1,6 +1,7 @@
 'use client'
 
 import { MapPin } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { useUpCatch } from './app-provider'
 import { PrimaryButton } from './primitives'
 import { LocationHelp } from '@/components/account/location-help'
@@ -14,7 +15,7 @@ export function LocationPermission(){
       <h2 id="location-title" className="font-display text-3xl font-extrabold">Enable your location</h2>
       <p id="location-description" className="mt-3 text-sm leading-relaxed text-muted-foreground">Location permission is required before going online. It helps place you on the map. Your exact location is not shown to other members.</p>
       {(state.locationStatus==='denied'||state.locationStatus==='unavailable') && <div className="mt-3"><LocationHelp denied={state.locationStatus==='denied'} /></div>}
-      {state.locationStatus==='denied' && <p role="alert" className="mt-3 text-sm font-semibold">Location is blocked. Allow location in your browser’s site settings, then retry.</p>}
+      {state.locationStatus==='denied' && <p role="alert" className="mt-3 text-sm font-semibold">Location is blocked. Allow UpCatch in your {Capacitor.isNativePlatform()?'phone settings':'browser site settings'}, then retry.</p>}
       {state.locationStatus==='unavailable' && <p role="alert" className="mt-3 text-sm font-semibold">We couldn’t get your location. Check your device’s location settings and connection, then retry.</p>}
       <PrimaryButton onClick={()=>{void actions.requestLocation()}} disabled={loading} className="mt-6 w-full" >{loading?'Getting location…':state.locationStatus==='denied'||state.locationStatus==='unavailable'?'Retry location':'Allow location'}</PrimaryButton>
       <button type="button" onClick={actions.dismissLocation} className="mt-4 w-full text-sm font-semibold text-muted-foreground">Stay offline for now</button>

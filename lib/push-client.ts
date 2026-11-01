@@ -26,6 +26,14 @@ function loadNativePush() {
   }).catch(error => { nativePush = undefined; throw error })
   return nativePush
 }
+
+async function waitForNativePushToken(client: typeof import('@onesignal/capacitor-plugin')['default']) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (await client.User.pushSubscription.getTokenAsync()) return true
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+  return false
+}
 export function loadPush() {
   if(!window.upcatchPush){
     window.upcatchPush=new Promise<OneSignalClient>((resolve,reject)=>{
@@ -98,6 +106,10 @@ export async function setPushEnabled(enabled: boolean) {
     await client.login(alias)
     await client.User.pushSubscription.optIn()
     if (!await client.User.pushSubscription.getOptedInAsync()) throw new Error('This device could not subscribe. Please retry or check your notification settings.')
+    if (!await waitForNativePushToken(client)) {
+      await client.User.pushSubscription.optOut().catch(() => undefined)
+      throw new Error('This device has not received a push token. Check Google Play services and the Android FCM setup, then retry.')
+    }
     try {
       const saved = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) })
       if (!saved.ok) throw new Error('Notification preference could not be saved. Please retry.')
@@ -138,7 +150,7 @@ export async function restorePush() {
     await client.login(alias)
     if (!await client.Notifications.hasPermission()) return false
     await client.User.pushSubscription.optIn()
-    return await client.User.pushSubscription.getOptedInAsync()
+    return await client.User.pushSubscription.getOptedInAsync() && Boolean(await client.User.pushSubscription.getTokenAsync())
   }
   if (!process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || !('Notification' in window) || Notification.permission !== 'granted') return false
   const response = await fetch('/api/push')
@@ -149,4 +161,17 @@ export async function restorePush() {
   await client.login(alias)
   await client.User.PushSubscription.optIn()
   return true
+}
+
+// Register after restoring the native session. The client refreshes live state
+// after a tap; notification payloads never grant access to a meetup.
+export async function listenForNativePushTaps(onOpen: () => void) {
+  if (!Capacitor.isNativePlatform() || !process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) return () => undefined
+  const client = await loadNativePush()
+  const handler = (event: { notification: { additionalData?: object } }) => {
+    const data = event.notification.additionalData as { route?: unknown } | undefined
+    if (data?.route === 'app') onOpen()
+  }
+  client.Notifications.addEventListener('click', handler)
+  return () => client.Notifications.removeEventListener('click', handler)
 }

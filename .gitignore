@@ -26,6 +26,13 @@ android/.idea/
 android/build/
 android/app/build/
 android/local.properties
+android/app/google-services.json
+*.jks
+*.keystore
+*.p8
+*.mobileprovision
 ios/DerivedData/
 ios/App/xcuserdata/
 ios/App/App.xcodeproj/xcuserdata/
+
+.vercel

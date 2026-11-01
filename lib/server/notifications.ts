@@ -56,7 +56,11 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     body:JSON.stringify({app_id:process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID,
       include_aliases:{external_id:[pushAlias(job.user_id)]},target_channel:'push',idempotency_key:job.id,
       headings:{en:job.payload?.title??'Welcome to UpCatch'},contents:{en:job.payload?.text??'Your profile is ready. Say hello to someone new.'},
-      web_url:siteUrl()+'/app',ttl}),
+      web_url:siteUrl()+'/app',
+      data:{route:'app'},
+      small_icon:'ic_stat_upcatch',
+      android_accent_color:'2B59FF',
+      ttl}),
   })
   if(!result.ok) throw new Error('Push provider returned '+result.status)
   const body=await result.json()

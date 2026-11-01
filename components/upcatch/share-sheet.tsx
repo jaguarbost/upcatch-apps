@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { haptic } from '@/lib/haptics'
 import type { Person } from '@/lib/upcatch-data'
 import { cn } from '@/lib/utils'
@@ -80,7 +81,9 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
   const [style, setStyle] = useState<(typeof CARD_STYLES)[number]>('Story')
   const [hideFace, setHideFace] = useState(true)
   const code = `${state.user.name.toUpperCase()}-7K`
-  const link = state.live ? (typeof window!=='undefined'?window.location.host:'') : `upcatch.app/i/${code.toLowerCase()}`
+  const shareOrigin = typeof window === 'undefined' ? '' : Capacitor.isNativePlatform()
+    ? process.env.NEXT_PUBLIC_SITE_URL || window.location.origin : window.location.origin
+  const link = state.live ? shareOrigin.replace(/^https?:\/\//, '') : `upcatch.app/i/${code.toLowerCase()}`
 
   const shareText =
     target.kind === 'meetup'
@@ -89,7 +92,7 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
 
   async function send(channel: string) {
     haptic('tap')
-    const url=state.live?window.location.origin:'https://'+link
+    const url=state.live?shareOrigin:'https://'+link
     try{
       if(channel==='save'){
         await document.fonts.ready

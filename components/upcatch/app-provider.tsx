@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { createClient } from '@/lib/supabase/client'
 import type { LiveBootstrap, LiveState, ProfileStats } from '@/lib/live-model'
 import { setPushEnabled as changePushEnabled, restorePush, detachPush } from '@/lib/push-client'
@@ -448,7 +449,11 @@ function useUpCatchState(initial?: LiveBootstrap) {
   },[initial,onboarded,requestLocation])
   useEffect(()=>{
     if(!initial||!onboarded)return
-    if(initial.pushEnabled)void restorePush().catch(()=>undefined)
+    if(initial.pushEnabled)void restorePush().then(enabled=>{
+      if(Capacitor.isNativePlatform())setPushEnabledState(enabled)
+    }).catch(()=>{
+      if(Capacitor.isNativePlatform())setPushEnabledState(false)
+    })
     const {data:{subscription}}=createClient().auth.onAuthStateChange(event=>{
       if(event==='SIGNED_OUT')void detachPush().catch(()=>undefined)
     })

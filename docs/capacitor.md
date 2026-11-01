@@ -1,40 +1,32 @@
-# Capacitor device builds
+# Capacitor client builds
 
-The `android/` and `ios/` folders are development projects for the existing Next.js app. The screens stay on the hosted Next.js server; the Capacitor WebView loads `/start` from `CAPACITOR_SERVER_URL`. Native plugins provide foreground approximate location and OneSignal push. The browser app keeps its existing browser APIs.
+`native-client/` packages the approved UpCatch screens with Vite. The installed app uses the existing hosted Next.js API and Supabase project. Its Supabase URL, publishable key, OneSignal app ID and API origin are public client configuration; server keys stay on the hosted backend. The release bundle has no `server.url`.
 
-## Run a device build
+## Prepare a local package
 
-Install Node 22 and pnpm 10.30.3. For Android, install Android Studio and an Android SDK. For iOS, use a Mac with Xcode. Configure the web server using `docs/setup.md` and give the device access to it through HTTPS.
+Use Node 22 and pnpm 10.30.3. Android needs Android Studio, an SDK and a supported JDK. iOS needs a Mac with Xcode and the operator's signing team. Copy `.env.example` to ignored `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and, when push is configured, `NEXT_PUBLIC_ONESIGNAL_APP_ID`. Set `MOBILE_API_BASE_URL` only when the deployed backend differs from `https://www.upcatch.uk`.
 
 ```powershell
 pnpm install
-$env:CAPACITOR_SERVER_URL = 'https://your-test-upcatch-host.example'
+pnpm native:assets
+pnpm native:bundle
 pnpm native:sync
-pnpm native:android
+pnpm native:check
+pnpm native:release-check
 ```
 
-On macOS, set `CAPACITOR_SERVER_URL` in the shell, run `pnpm native:sync`, then `pnpm native:ios`. Run the app from Android Studio or Xcode. `CAPACITOR_SERVER_URL` is a build-time development setting. Sync again after changing it. Without it, the native project opens a setup page instead of the live app. Local `http://localhost` is accepted for simulator experiments, but a physical device needs a reachable HTTPS origin.
+Leave `CAPACITOR_SERVER_URL` unset for those commands and for release builds. `native:bundle` requires public Supabase configuration and creates `capacitor-web/`; `native:sync` copies that bundle into both native projects. The release check confirms the copied entry and script exist locally and neither platform has a remote WebView URL. It cannot prove offline launch or native device behavior; run those checks on installed builds.
 
-## Native configuration still required
+`pnpm native:android` opens the Android project. On a Mac, `pnpm native:ios` opens the iOS project. Android release signing reads the `UPCATCH_ANDROID_KEYSTORE_FILE`, `UPCATCH_ANDROID_KEYSTORE_PASSWORD`, `UPCATCH_ANDROID_KEY_ALIAS`, and `UPCATCH_ANDROID_KEY_PASSWORD` environment variables. Keep signing files and secrets out of this repository.
 
-- Use the same OneSignal App ID for the configured Web, Android and iOS platforms, or separate staging and production apps. Keep the API key and alias secret on the Next.js server. Add Firebase Cloud Messaging credentials for Android and APNs credentials for iOS in OneSignal.
-- In Xcode, select the `App` target and set its signing team. The project includes Push Notifications and remote-notification background capability settings, debug/release APNs entitlements, and `handleApplicationNotifications: false` for OneSignal. Confirm Xcode signs each configuration with the matching APNs environment. Add a Notification Service Extension and App Group if rich notifications, confirmed receipts or OneSignal badges are needed.
-- The Android manifest requests coarse location and notification permission. The iOS plist contains the When In Use location explanation. Check the exact permission wording and store declarations with the product owner before release.
-- The generated native IDs are `uk.co.upcatch.app`. Confirm the final bundle ID, signing profiles and app icons before distributing a build.
+## Device development
 
-## Test on real devices
+`CAPACITOR_SERVER_URL` remains available for a reachable HTTPS development host. Set it before `pnpm native:sync` and unset it before creating a release. It is a live development route; the locally bundled client is the release route.
 
-Sign in with email and password, allow location, go online, enable push, receive an offer, tap it, disable push, then sign out and test a second account on the same device. Test denied and later restored permissions. Check OneSignal subscriptions and deliveries separately for Android and iOS. Google OAuth and email links currently return to the website; native return links need a dedicated deep-link flow before relying on them in the installed app.
+## External setup and acceptance
 
-Capacitor documents `server.url` as a live-reload feature and does not recommend it for production. This Next.js app uses server actions and cannot be exported as static assets. A store-ready native release needs a bundled client that talks to the hosted backend, or another reviewed production architecture. Do not ship the current remote-URL configuration as a store build.
-
-## Technical release to-do
-
-1. Keep the existing Supabase project and versioned migrations as the data source. Deploy the Next.js backend with the same Supabase URL and keys; put server secrets only in the hosting environment. The native binary contains no database credentials beyond the existing public Supabase configuration in web assets.
-2. Replace the development `server.url` approach with a reviewed production client architecture. The current server actions, server rendering and same-origin cookies mean a plain static export is insufficient. Preserve the approved components and UI when separating the client from the backend.
-3. Configure Android FCM and iOS APNs in the existing OneSignal app, then verify the same alias and server preference across web and mobile subscriptions. Keep push TTL and generic notification content. Add native notification icons and check notification taps reopen the correct authenticated app screen.
-4. Add native return links for Google sign-in and email confirmation/reset, including system-browser OAuth, Android App Links and iOS Universal Links. Test cold-start, warm-start and expired links.
-5. Build and test on current Android Studio/JDK/SDK and macOS/Xcode. Test coarse-location denial and restoration, permission changes, push opt-in/out, account switching, foreground/background delivery, and offers expiring while offline.
-6. Align package, Android and iOS versions for each release. Complete app icons, signing, privacy declarations and store review. Test the hosted Supabase, OneSignal, email and cron services separately from local tests.
-
-OneSignal is optional. Direct APNs and FCM delivery would require a device-token table and RLS, authenticated token registration and removal, Apple/Google credentials, separate provider transports, retry and expiry handling, token cleanup and delivery monitoring. The existing OneSignal alias flow already handles device subscriptions without a new token table, so it is the smaller change for the first native release.
+- Allow `uk.co.upcatch.app://auth/callback` in the same Supabase Auth project. Configure email templates to return native confirmation and recovery links while preserving web links. Test Google, confirmation and reset returns on cold and warm Android and iOS launches.
+- Configure Android FCM and iOS APNs in OneSignal for `uk.co.upcatch.app`. OneSignal's Capacitor setup requires the Android FCM service account in the OneSignal dashboard. If this Android app also uses a Firebase client configuration, put its `google-services.json` in the ignored `android/app/` location; do not put the FCM service account key in the binary. Configure the Apple team and push capability in Xcode. Keep provider credentials out of the app bundle.
+- Verify coarse location, optional camera and notification permissions on both platforms. Android declares coarse location, camera and notifications; iOS declares When In Use location and camera explanations. The existing app UI requests camera for a photo or QR scan only after a user action.
+- Run two-account hosted regressions for auth, profile photo authorization, Go Live, offer expiry, meetup lifecycle, push opt-in/out, account switching and offline launch. Record web, Android and iOS evidence separately from local checks.
+- Match `package.json`, Android and iOS version strings, and increment the native build numbers for each uploaded binary. Finish store privacy declarations and listings against the final binary. See `docs/native-release-operations.md` and `docs/native-release-plan.md`.

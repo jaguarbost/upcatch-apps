@@ -1,9 +1,9 @@
 import 'server-only'
 import { NativeAuthError } from './native-member'
 
-const appOrigins = new Set(['capacitor://localhost', 'http://localhost'])
+const appOrigins = new Set(['capacitor://localhost', 'https://localhost', 'http://localhost'])
 
-function originHeaders(request: Request) {
+export function nativeHeaders(request: Request) {
   const origin = request.headers.get('origin')
   return {
     'Cache-Control': 'private, no-store',
@@ -18,7 +18,17 @@ export function nativeOriginAllowed(request: Request) {
 }
 
 export function nativeJson(request: Request, body: unknown, status = 200) {
-  return Response.json(body, { status, headers: originHeaders(request) })
+  return Response.json(body, { status, headers: nativeHeaders(request) })
+}
+
+export function nativeImage(request: Request, bytes: ArrayBuffer) {
+  return new Response(bytes, {
+    headers: {
+      ...nativeHeaders(request),
+      'Content-Type': 'image/jpeg',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
 }
 
 export function nativeError(request: Request, error: unknown) {
@@ -34,7 +44,7 @@ export function nativePreflight(request: Request, methods: string) {
   return new Response(null, {
     status: 204,
     headers: {
-      ...originHeaders(request),
+      ...nativeHeaders(request),
       'Access-Control-Allow-Methods': methods,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type',
       'Access-Control-Max-Age': '600',

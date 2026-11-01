@@ -1,0 +1,8 @@
+.worktrees/
+.pnpm-store/
+.next/
+node_modules/
+android/
+ios/
+capacitor-web/
+.env.local

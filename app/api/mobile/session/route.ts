@@ -9,8 +9,8 @@ export async function GET(request: Request) {
     const { user, profile } = await requireNativeMember(request)
     return nativeJson(request, {
       memberId: user.id,
-      email: user.email,
-      displayName: profile.display_name,
+      email: user.email ?? null,
+      displayName: profile.display_name ?? null,
       onboardingComplete: Boolean(profile.onboarding_completed_at),
     })
   } catch (error) {
