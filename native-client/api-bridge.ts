@@ -36,13 +36,15 @@ export function installPrivateImageBridge(api: MobileApi) {
   }
   const update = (img: HTMLImageElement) => {
     const source = img.getAttribute('src') || ''
-    if (!source.startsWith('/api/member-photo?') && !source.startsWith('/api/friend-photo?')) return
+    if (!source.startsWith('/api/member-photo?') && !source.startsWith('/api/friend-photo?') && !source.startsWith('/api/wall-photo?')) return
     if (inFlight.get(img) === source) return
     inFlight.set(img, source)
     const url = new URL(source, window.location.origin)
     const photo = url.pathname.endsWith('/member-photo')
       ? api.memberPhoto(url.searchParams.get('meetup') || '')
-      : api.friendPhoto(url.searchParams.get('id') || '', url.searchParams.get('token') || undefined)
+      : url.pathname.endsWith('/wall-photo')
+        ? api.wallPhoto(url.searchParams.get('post') || '')
+        : api.friendPhoto(url.searchParams.get('id') || '', url.searchParams.get('token') || undefined)
     void photo.then(blob => {
       inFlight.delete(img)
       if (!img.isConnected || img.getAttribute('src') !== source) return

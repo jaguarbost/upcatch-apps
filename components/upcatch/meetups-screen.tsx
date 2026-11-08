@@ -1,23 +1,26 @@
 'use client'
 
-import { CalendarClock, Compass, Hourglass, MapPin, Star } from 'lucide-react'
+import { Compass, Hourglass, MapPin, MessageCircle, Star } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { intentById, venueById } from '@/lib/upcatch-data'
 import { cn } from '@/lib/utils'
 import { useUpCatch, useVenueLookup } from './app-provider'
 import { PersonAvatar, PrimaryButton } from './primitives'
+import { ScheduledWall } from './scheduled-wall'
+import { CancellationWarning } from './cancellation-warning'
 
-const TABS = ['active', 'upcoming', 'past'] as const
+const TABS = ['active', 'past'] as const
 type MeetupTab = (typeof TABS)[number]
 
 export function MeetupsScreen() {
   const { state, actions } = useUpCatch()
   const lookupVenue=useVenueLookup()
   const [view, setView] = useState<MeetupTab>('active')
+  const [confirmScheduledCancel, setConfirmScheduledCancel] = useState<string | null>(null)
 
   const inJourney = state.phase === 'live' || state.phase === 'arrived'
   const isHosting = state.phase === 'hosting'
-  const hasActive = inJourney || isHosting || state.phase==='free'
+  const activeCount = state.scheduledPlans.length + (inJourney || isHosting || state.phase==='free' ? 1 : 0)
 
   return (
     <main className="absolute inset-0 z-20 flex flex-col bg-background animate-in fade-in duration-200">
@@ -37,15 +40,24 @@ export function MeetupsScreen() {
               )}
             >
               {v}
-              {v === 'active' && hasActive && ' (1)'}
+              {v === 'active' && activeCount > 0 && ` (${activeCount})`}
             </button>
           ))}
         </div>
       </header>
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-28 [&>*]:shrink-0 lg:mx-auto lg:w-full lg:max-w-xl">
+        {view === 'active' && state.scheduledPlans.map(plan => <div key={plan.post_id} className="rounded-3xl bg-primary p-5 text-primary-foreground">
+          <span className="rounded-full bg-live px-3 py-1 text-xs font-extrabold text-live-foreground">SCHEDULED</span>
+          <h2 className="mt-3 font-display text-xl font-extrabold">{intentById(plan.intent).label} with {plan.partner_name}</h2>
+          <p className="mt-1 text-sm opacity-85">{new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(plan.starts_at))}</p>
+          <p className="mt-2 text-sm opacity-85">{plan.note}</p>
+          <p className="mt-3 text-xs font-semibold opacity-85">You can Go Live before this meeting if the times do not overlap.</p>
+          <button type="button" onClick={() => actions.openMessages('scheduled',plan.post_id)} className="press mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-card font-bold text-primary"><MessageCircle className="size-4" aria-hidden="true" /> Message {plan.partner_name}</button>
+          <button type="button" onClick={() => setConfirmScheduledCancel(plan.post_id)} className="press mt-3 min-h-11 rounded-xl bg-card/15 px-4 text-sm font-bold">Cancel invite</button>
+        </div>)}
         {view === 'active' &&
-          (hasActive ? (
+          (inJourney || isHosting || state.phase==='free' ? (
             <button
               type="button"
               onClick={() => actions.setTab('map')}
@@ -77,22 +89,16 @@ export function MeetupsScreen() {
                 </>
               )}
             </button>
-          ) : (
+          ) : state.scheduledPlans.length===0 ? (
             <EmptyMeetups
               icon={<Compass className="size-8 text-muted-foreground" aria-hidden="true" />}
               title="Nothing active"
               body="Go online or create an UpCatch — it’ll show up here the moment it starts."
               action
             />
-          ))}
+          ) : null)}
 
-        {view === 'upcoming' && (
-          <EmptyMeetups
-            icon={<CalendarClock className="size-8 text-muted-foreground" aria-hidden="true" />}
-            title="No upcoming meetups"
-            body="Accepted invites you haven’t started yet will land here."
-          />
-        )}
+        {view === 'active' && inJourney && state.meetup && <button type="button" onClick={() => actions.openMessages('live')} className="press flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-primary font-bold text-primary-foreground"><MessageCircle className="size-5" aria-hidden="true" /> Message {state.meetup.person.name}</button>}
 
         {view === 'past' &&
           (state.history.length > 0 ? (
@@ -126,6 +132,7 @@ export function MeetupsScreen() {
             />
           ))}
       </div>
+      {confirmScheduledCancel && <CancellationWarning onKeep={() => setConfirmScheduledCancel(null)} onCancel={() => { actions.cancelScheduledPlan(confirmScheduledCancel); setConfirmScheduledCancel(null) }} />}
     </main>
   )
 }
@@ -148,9 +155,20 @@ function EmptyMeetups({ icon, title, body, action }: { icon: ReactNode; title: s
           }}
           className="w-full text-base"
         >
-          I’m free now
+          Are you free?
         </PrimaryButton>
       )}
     </div>
+  )
+}
+
+export function WallScreen() {
+  const { state } = useUpCatch()
+  return (
+    <main className="absolute inset-0 z-20 flex flex-col bg-background animate-in fade-in duration-200">
+      <div className="flex-1 overflow-y-auto px-4 pb-28 pt-[calc(max(env(safe-area-inset-top),1rem)+4rem)] lg:mx-auto lg:w-full lg:max-w-xl">
+        <ScheduledWall enabled={Boolean(state.live)} />
+      </div>
+    </main>
   )
 }

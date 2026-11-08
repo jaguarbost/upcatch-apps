@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Capacitor } from '@capacitor/core'
 import { createClient } from '@/lib/supabase/client'
 import type { LiveBootstrap, LiveState, ProfileStats } from '@/lib/live-model'
 import { setPushEnabled as changePushEnabled, restorePush, detachPush } from '@/lib/push-client'
@@ -19,7 +18,7 @@ import {
 } from '@/lib/upcatch-data'
 
 export type Phase = 'idle' | 'free' | 'hosting' | 'live' | 'arrived' | 'rating'
-export type Tab = 'map' | 'messages' | 'activity' | 'meetups' | 'profile'
+export type Tab = 'map' | 'wall' | 'messages' | 'activity' | 'meetups' | 'profile' | 'nudges'
 
 export interface UserProfile {
   name: string
@@ -36,6 +35,7 @@ export interface Draft {
   radiusKm: number
   prefs: string[]
   venueId: string | null
+  scheduledAt: string
 }
 
 export interface Meetup {
@@ -45,6 +45,16 @@ export interface Meetup {
   durationMin: number
   startLabel: string
   endLabel: string
+}
+
+export interface ScheduledPlan {
+  post_id: string
+  starts_at: string
+  ends_at: string
+  intent: IntentId
+  note: string
+  partner_name: string
+  is_mine: boolean
 }
 
 export interface JoinRequest {
@@ -76,6 +86,7 @@ const DEFAULT_DRAFT: Draft = {
   radiusKm: 4.828032,
   prefs: [],
   venueId: null,
+  scheduledAt: '',
 }
 
 const SEEDED_HISTORY: HistoryItem[] = [
@@ -117,6 +128,28 @@ function useUpCatchState(initial?: LiveBootstrap) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [freeForMin, setFreeForMin] = useState(60)
   const [createStep, setCreateStep] = useState(0)
+  const [createMode, setCreateMode] = useState<'instant' | 'scheduled'>('instant')
+  const [createModeLocked, setCreateModeLocked] = useState(false)
+  const [scheduledBusy, setScheduledBusy] = useState(false)
+  const [scheduledPostNotice, setScheduledPostNotice] = useState<string | null>(null)
+  const [scheduledPlan, setScheduledPlan] = useState<ScheduledPlan | null>(null)
+  const [scheduledPlans, setScheduledPlans] = useState<ScheduledPlan[]>([])
+  const [scheduledPlanFlash, setScheduledPlanFlash] = useState<ScheduledPlan | null>(null)
+  const [scheduledMessages, setScheduledMessages] = useState<Message[]>([])
+  const [scheduledMessageMap, setScheduledMessageMap] = useState<Record<string,Message[]>>({})
+  const [messageTarget, setMessageTarget] = useState<'live' | 'scheduled' | null>(null)
+  const [selectedScheduledPostId, setSelectedScheduledPostId] = useState<string | null>(null)
+  useEffect(()=>{
+    if(window.location.pathname!=='/app')return
+    const params=new URLSearchParams(window.location.search)
+    const view=params.get('view')
+    if(view==='messages'){
+      setTab('messages')
+      const chat=params.get('chat')
+      setMessageTarget(chat==='live'?'live':chat==='scheduled'?'scheduled':null)
+      setSelectedScheduledPostId(chat==='scheduled'?params.get('post'):null)
+    }else if(view==='meetups'||view==='wall'||view==='nudges')setTab(view)
+  },[])
   const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT)
   const [hosting, setHosting] = useState<Draft | null>(null)
   const [incoming, setIncoming] = useState<Offer | null>(null)
@@ -237,8 +270,11 @@ function useUpCatchState(initial?: LiveBootstrap) {
       },
       setTab(t: Tab) {
         haptic('tap')
+        if(t==='messages'){setMessageTarget(null);setSelectedScheduledPostId(null)}
         setTab(t)
       },
+      openMessages(target:'live'|'scheduled',postId?:string){setMessageTarget(target);setSelectedScheduledPostId(postId??null);setTab('messages')},
+      closeMessages(){setMessageTarget(null);setSelectedScheduledPostId(null)},
       setFree(on: boolean) {
         setPhase(on ? 'free' : 'idle')
         if (!on) setIncoming(null)
@@ -257,11 +293,15 @@ function useUpCatchState(initial?: LiveBootstrap) {
           startsInMin: offer.startsInMin,
         })
       },
-      openCreate() {
+      openCreate(mode: 'instant' | 'scheduled' = 'instant') {
         haptic('select')
+        setCreateMode(mode)
+        setCreateModeLocked(mode === 'scheduled')
+        if (mode === 'scheduled') setScheduledPostNotice(null)
         setDraft(DEFAULT_DRAFT)
         setCreateStep(1)
       },
+      chooseCreateMode(mode: 'instant' | 'scheduled') { if (!createModeLocked) setCreateMode(mode) },
       closeCreate() {
         setCreateStep(0)
       },
@@ -269,6 +309,9 @@ function useUpCatchState(initial?: LiveBootstrap) {
       updateDraft(patch: Partial<Draft>) {
         setDraft((d) => ({ ...d, ...patch }))
       },
+      publishScheduled() { showToast('Sign in to create a scheduled invite.') },
+      cancelScheduledPlan() { showToast('Sign in to manage a scheduled invite.') },
+      dismissScheduledPostNotice() { setScheduledPostNotice(null) },
       publish() {
         haptic('success')
         setHosting(draft)
@@ -315,7 +358,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
         setPhase('idle')
         showToast(reason ?? 'UpCatch cancelled. No penalty this time.')
       },
-      submitFeedback(rating: number | null,_met: boolean | null) {
+      submitFeedback(rating: number | null,_met: boolean | null,_noShow = false) {
         if(meetup && rating){setHistory(h=>[{id:'h'+Date.now(),person:meetup.person,intent:meetup.intent,venueId:meetup.venueId,rating,when:'Just now'},...h])}
         setMeetup(null);setMessages([]);setPhase('idle');showToast('Thanks for your feedback.')
       },
@@ -340,6 +383,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
           haptic('select')
         }, 1600)
       },
+      sendScheduledMessage(text:string,postId?:string){showToast('Sign in to message a scheduled meetup.')},
       showToast,
       toggleBrand() {
         haptic('select')
@@ -395,13 +439,12 @@ function useUpCatchState(initial?: LiveBootstrap) {
   )
 
 
-  const [partnerLocation,setPartnerLocation]=useState<{position:[number,number];initials:string;updatedAt:string|null}|null>(null)
   const [creationType,setCreationType]=useState<'manual'|'auto'>('auto')
   const [recenterKey,setRecenterKey]=useState(0)
   const [badgeStats,setBadgeStats]=useState<Record<string,number>>({})
   const [profileStats,setProfileStats]=useState<ProfileStats>({completed_meetups:initial?.completedMeetups??0,rating:null,rating_count:0,show_up_percent:null})
   const [audience,setAudience]=useState<'friends'|'public'|'both'>('both')
-  const [memberSettings,setMemberSettings]=useState<Record<string,boolean>>({verifiedOnly:false,share:false,hideAge:false,notifyFriends:false,friendMeetups:false,friendsFirst:false})
+  const [memberSettings,setMemberSettings]=useState<Record<string,boolean>>({verifiedOnly:false,share:false,hideAge:false,notifyFriends:true,friendMeetups:true,friendsFirst:true})
   const [blockedCount,setBlockedCount]=useState(0)
   const [trustedEmail,setTrustedEmail]=useState<string|null>(null)
   const [locationStatus,setLocationStatus]=useState<'unknown'|'granted'|'denied'|'loading'|'unavailable'>('unknown')
@@ -449,11 +492,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
   },[initial,onboarded,requestLocation])
   useEffect(()=>{
     if(!initial||!onboarded)return
-    if(initial.pushEnabled)void restorePush().then(enabled=>{
-      if(Capacitor.isNativePlatform())setPushEnabledState(enabled)
-    }).catch(()=>{
-      if(Capacitor.isNativePlatform())setPushEnabledState(false)
-    })
+    if(initial.pushEnabled)void restorePush().catch(()=>undefined)
     const {data:{subscription}}=createClient().auth.onAuthStateChange(event=>{
       if(event==='SIGNED_OUT')void detachPush().catch(()=>undefined)
     })
@@ -467,6 +506,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
   const seenOnlineFriends=useRef(new Set<string>())
   const liveCommands = useRef<Promise<boolean>>(Promise.resolve(false))
   const previousMatch = useRef<Meetup | null>(null)
+  const seenScheduledPlans = useRef(new Set<string>())
   const snapshot = useRef<LiveState | null>(null)
   const snapshotVersion=useRef(0)
   const makePerson = useCallback((name: string, id: string): Person => ({
@@ -477,10 +517,35 @@ function useUpCatchState(initial?: LiveBootstrap) {
   const refreshLive = useCallback(async () => {
     if(!initial || !onboarded)return
     const version=++snapshotVersion.current
-    const {data,error}=await createClient().rpc('my_live_state')
+    const client=createClient()
+    const [{data,error},{data:plans,error:planError}]=await Promise.all([
+      client.rpc('my_live_state'),client.rpc('my_scheduled_plans'),
+    ])
     if(error){showToast('Meetup status could not be loaded. Please try again.');return}
+    if(planError){showToast('Scheduled meetup status could not be loaded. Please try again.');return}
     if(version!==snapshotVersion.current)return
     const s=data as LiveState
+    const nextPlans=(plans??[]) as ScheduledPlan[]
+    const nextPlan=nextPlans[0]??null
+    const scheduledResults=await Promise.all(nextPlans.map(async item=>({postId:item.post_id,result:await client.rpc('list_scheduled_messages',{p_post:item.post_id})})))
+    if(version!==snapshotVersion.current)return
+    setScheduledPlan(nextPlan)
+    setScheduledPlans(nextPlans)
+    const nextMessageMap:Record<string,Message[]>={}
+    for(const item of scheduledResults){
+      if(item.result.error){showToast('Scheduled messages could not be loaded. Please try again.');continue}
+      nextMessageMap[item.postId]=(item.result.data??[]).map((row:{id:number;body:string;sender_is_me:boolean})=>({id:row.id,from:row.sender_is_me?'me':'them',text:row.body}))
+    }
+    setScheduledMessageMap(nextMessageMap)
+    setScheduledMessages(nextPlan ? nextMessageMap[nextPlan.post_id]??[] : [])
+    const unseen=nextPlans.find(item=>!seenScheduledPlans.current.has(item.post_id))
+    nextPlans.forEach(item=>seenScheduledPlans.current.add(item.post_id))
+    if(unseen){
+      if(!s.meetup && !s.feedback_pending){
+        setScheduledPlanFlash(unseen)
+        setTimeout(()=>setScheduledPlanFlash(null),1700)
+      }
+    }
     const before=snapshot.current?.meetup
     snapshot.current=s
     setCreationType(s.meetup?.creation_type??s.queue?.creation_type??'auto')
@@ -489,7 +554,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
     setLiveMatch(s.meetup)
     if(s.queue && ['coffee','lunch','drink'].includes(s.queue.intent))setFreeForMin(s.queue.intent==='coffee'?30:s.queue.intent==='lunch'?60:120)
     setMessages((s.messages??[]).slice().sort((a,b)=>a.id-b.id))
-    if(s.settings){setAudience(s.settings.audience??'both');setMemberSettings(s.settings.prefs??{});setTrustedEmail(s.settings.trusted_email??null);setUser(u=>({...u,age:s.settings?.age??u.age,interests:s.settings?.interests??u.interests}))}
+    if(s.settings){setAudience(s.settings.audience??'both');setMemberSettings(current=>({...current,...(s.settings?.prefs??{})}));setTrustedEmail(s.settings.trusted_email??null);setUser(u=>({...u,age:s.settings?.age??u.age,interests:s.settings?.interests??u.interests}))}
     setBlockedCount(s.blocked_count??0)
     const currentFriends=(s.friends??[]).map(f=>({person:{...makePerson(f.name,f.id),photo:'/api/friend-photo?id='+encodeURIComponent(f.id)},status:f.status,where:f.status==='free'?'Online':'Offline',since:''}))
     setFriends(currentFriends)
@@ -507,18 +572,12 @@ function useUpCatchState(initial?: LiveBootstrap) {
       const old=previousMatch.current?.person.id===s.feedback_pending.id?previousMatch.current:null
       const feedbackMeetup:Meetup|null=old??(h?{person:{...makePerson(h.other_name??'Your meetup',h.id),photo:'/api/member-photo?meetup='+encodeURIComponent(h.id)},venueId:'',intent:h.intent,durationMin:Math.round((Date.parse(h.ends_at)-Date.parse(h.starts_at))/60000),startLabel:new Date(h.starts_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:initial.timezone}),endLabel:new Date(h.ends_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:initial.timezone})}:null)
       setFeedbackStatus(s.feedback_pending.status)
-      setPartnerLocation(null);setIncoming(null);setHosting(null);setMeetup(feedbackMeetup);setPhase('rating')
+      setIncoming(null);setHosting(null);setMeetup(feedbackMeetup);setPhase('rating')
       return
     }
     setFeedbackStatus(null)
     const m=s.meetup
     if(m){
-      if(m.status==='draft')setPartnerLocation(null)
-      else{
-        const {data:area,error:areaError}=await createClient().rpc('my_partner_location')
-        if(version!==snapshotVersion.current)return
-        setPartnerLocation(!areaError&&area?.meetup_id===m.id&&Number.isFinite(area.latitude)&&Number.isFinite(area.longitude)?{position:[area.latitude,area.longitude],initials:m.other_name.trim().slice(0,2).toUpperCase().replace(/[^A-Z]/g,''),updatedAt:area.updated_at}:null)
-      }
       const venue=m.venue ? initial.venues.find(v=>v.name===m.venue?.name) : undefined
       // Venue selection is left to members in chat; it never blocks a match.
       const next:Meetup={person:{...makePerson(m.other_name,m.id),age:m.other_age??0,interests:m.other_interests??[],verified:{id:m.other_verified??false,photo:false,phone:false},showUpPercent:m.other_show_up_percent??null,ratingReceived:m.other_rating??null,photo:'/api/member-photo?meetup='+encodeURIComponent(m.id)},venueId:venue?.id??'',intent:m.intent,durationMin:Math.round((Date.parse(m.ends_at)-Date.parse(m.starts_at))/60000),startLabel:new Date(m.starts_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:initial.timezone}),endLabel:new Date(m.ends_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:initial.timezone})}
@@ -527,20 +586,17 @@ function useUpCatchState(initial?: LiveBootstrap) {
         setMeetup(null);setHosting(null);setPhase('free')
         setIncoming({person:next.person,venueId:next.venueId,intent:next.intent,durationMin:next.durationMin,startsInMin:0,note:m.accepted?'You accepted. Waiting for them.':(m.note||'Accept to confirm this meetup.')} as Offer)
       }else{
-        if(before?.status==='draft'){setMatchFlash(next.person);setTimeout(()=>setMatchFlash(null),1700)}
+        if(!before || before.status==='draft'){setMatchFlash(next.person);setTimeout(()=>setMatchFlash(null),1700)}
         setIncoming(null);setHosting(null);setMeetup(next);setProgress({me:m.arrived?1:0,them:m.other_arrived?1:0});setPhase(m.arrived?'arrived':'live')
       }
     }else if(s.awaiting_offer){
-      setPartnerLocation(null)
       setIncoming(null);setMeetup(null);setHosting(null);setPhase('free')
     }else if(s.queue){
-      setPartnerLocation(null)
       setIncoming(null);setMeetup(null)
       if(s.queue.venue_id){setHosting({ ...DEFAULT_DRAFT,intent:s.queue.intent,venueId:s.queue.venue_id,durationMin:s.queue.duration_min,windowMin:s.queue.duration_min });setPhase('hosting')}else{setHosting(null);setPhase('free')}
       const completed=previousMatch.current&&s.history.find(h=>h.id===previousMatch.current?.person.id&&h.status==='completed'&&h.rating===null)
       if(completed){setMeetup(previousMatch.current);setPhase('rating')}
     }else{
-      setPartnerLocation(null)
       setIncoming(null);setHosting(null)
       const completed=previousMatch.current&&s.history.find(h=>h.id===previousMatch.current?.person.id&&h.status==='completed'&&h.rating===null)
       if(completed){setMeetup(previousMatch.current);setPhase('rating')}
@@ -568,10 +624,12 @@ function useUpCatchState(initial?: LiveBootstrap) {
         const client=createClient()
         const {error}=command==='live'
           ? await client.rpc('go_online',{p_intent:args.p_intent,p_duration:args.p_duration})
+          : command==='cancel'&&snapshot.current?.meetup?.status==='confirmed'
+            ? await client.rpc('cancel_current_meetup')
           : command==='search'
             ? await client.rpc('update_matching_search',args)
             : command==='feedback'&&args.p_meetup
-              ? await client.rpc('complete_meetup_feedback',{p_meetup:args.p_meetup,p_rating:args.p_rating??null,p_met:args.p_met??null})
+              ? await client.rpc('complete_meetup_feedback',{p_meetup:args.p_meetup,p_rating:args.p_rating??null,p_met:args.p_met??null,p_no_show:args.p_no_show??false})
             : command==='rate'&&args.p_meetup
               ? await client.rpc('rate_meetup',{p_meetup:args.p_meetup,p_rating:args.p_rating})
               : await client.rpc('meetup_command',{p_command:command,...args})
@@ -593,7 +651,8 @@ function useUpCatchState(initial?: LiveBootstrap) {
     ...actions,
     requestLocation,
     dismissLocation(){setLocationPrompt(false)},
-    openCreate(){if(snapshot.current?.meetup){showToast('Finish or cancel your current invite first.');return}actions.openCreate();setTab('map')},
+    openCreate(mode: 'instant' | 'scheduled' = 'instant'){if(mode==='instant'&&snapshot.current?.meetup){showToast('Finish or cancel your current invite first.');return}actions.openCreate(mode);setTab('map')},
+    chooseCreateMode(mode: 'instant' | 'scheduled'){if(mode==='instant'&&snapshot.current?.meetup){showToast('Finish or cancel your current invite first.');return}actions.chooseCreateMode(mode)},
     recenterMap(){if(savedLocation.current){void requestLocation(false,true);setRecenterKey(k=>k+1)}else if(locationRequest.current){void locationRequest.current.then(ok=>{if(ok)setRecenterKey(k=>k+1)})}else setLocationPrompt(true)},
     setAudience(value:'friends'|'public'|'both'){setAudience(value);void commandLive('search',{p_audience:value})},
     setPushEnabled(enabled:boolean){void (async()=>{
@@ -628,6 +687,30 @@ function useUpCatchState(initial?: LiveBootstrap) {
       })()
     },
     setFreeForMin(minutes:number){setFreeForMin(minutes);if(snapshot.current?.queue||snapshot.current?.awaiting_offer||snapshot.current?.meetup?.status==='draft')void commandLive('search',{p_intent:minutes===30?'coffee':minutes===60?'lunch':'drink',p_duration:minutes})},
+    publishScheduled(){
+      if(busy.current)return
+      const date=new Date(draft.scheduledAt)
+      if(!draft.intent){showToast('Choose an activity.');return}
+      if(!draft.note.trim()){showToast('Write a short invite.');return}
+      if(!Number.isFinite(date.getTime())){showToast('Choose a date and time.');return}
+      busy.current=true;setScheduledBusy(true)
+      void (async()=>{try{
+        const {error}=await createClient().rpc('create_scheduled_post',{p_intent:draft.intent,p_starts_at:date.toISOString(),p_note:draft.note.trim(),p_duration:draft.durationMin,p_radius:draft.radiusKm,p_preferences:draft.prefs})
+        if(error){showToast(error.code==='P0001'?error.message:'Could not create your invite. Please retry.');return}
+        void fetch('/api/notifications',{method:'POST'}).catch(()=>undefined)
+        setScheduledPostNotice('Your scheduled invite is live on the Wall.')
+        setCreateStep(0);setTab('wall')
+      }catch{showToast('Connection lost. Please try again.')}finally{busy.current=false;setScheduledBusy(false)}})()
+    },
+    cancelScheduledPlan(postId:string){
+      void (async()=>{
+        const {error}=await createClient().rpc('cancel_scheduled_plan',{p_post:postId})
+        if(error){showToast(error.code==='P0001'?error.message:'Could not cancel this invite. Please retry.');return}
+        setScheduledPlan(null)
+        await refreshLive()
+        showToast('Scheduled invite cancelled.')
+      })()
+    },
     publish(){if(locationStatus!=='granted'){setLocationPrompt(true);return}if(busy.current)return;busy.current=true;void (async()=>{try{const {error}=await createClient().rpc('publish_availability',{p_intent:draft.intent,p_duration:draft.durationMin,p_window:draft.windowMin,p_radius:draft.radiusKm,p_note:draft.note,p_preferences:draft.prefs});if(error){showToast(error.code==='P0001'?error.message:'Unable to go online. Please retry.');return}setCreateStep(0);setTab('map');await refreshLive()}finally{busy.current=false}})()},
     passOffer(){void commandLive('pass')},
     acceptOffer(){void commandLive('accept')},
@@ -642,9 +725,10 @@ function useUpCatchState(initial?: LiveBootstrap) {
       busy.current=true
       void (async()=>{try{const {error}=await createClient().rpc('report_current_meetup',{p_reason:reason,p_block:block});if(error){showToast('Report could not be saved. Please try again.');return}await refreshLive();showToast(block?'Member blocked and meetup cancelled.':'Report saved for review. Meetup cancelled.')}catch{showToast('Connection lost. Please try again.')}finally{busy.current=false}})()
     },
-    submitFeedback(rating:number|null,met:boolean|null){const pending=snapshot.current?.feedback_pending;if(!pending){showToast('Feedback is no longer pending.');return}void commandLive('feedback',{p_meetup:pending.id,p_rating:rating,p_met:met}).then(saved=>{if(saved)showToast('Thanks for your feedback.')})},
+    submitFeedback(rating:number|null,met:boolean|null,noShow=false){const pending=snapshot.current?.feedback_pending;if(!pending){showToast('Feedback is no longer pending.');return}void commandLive('feedback',{p_meetup:pending.id,p_rating:rating,p_met:met,p_no_show:noShow}).then(saved=>{if(saved)showToast('Thanks for your feedback.')})},
     submitRating(rating:number){if(rating===0){previousMatch.current=null;setMeetup(null);setPhase('idle');return}const id=previousMatch.current?.person.id;if(!id){showToast('Reload your meetup before rating.');return}void commandLive('rate',{p_meetup:id,p_rating:rating}).then(saved=>{if(saved)showToast('Thanks! Your rating was saved.')})},
-    sendMessage(text:string){void createClient().rpc('send_meetup_message',{p_text:text}).then(async({error})=>{if(error){showToast(error.code==='P0001'?error.message:'Message could not be sent.');return}await refreshLive()})},
+    sendMessage(text:string){void createClient().rpc('send_meetup_message',{p_text:text}).then(async({error})=>{if(error){showToast(error.code==='P0001'?error.message:'Message could not be sent.');return}void fetch('/api/notifications',{method:'POST'}).catch(()=>undefined);await refreshLive()})},
+    sendScheduledMessage(text:string,postId?:string){const id=postId??scheduledPlan?.post_id;if(!id){showToast('This chat is no longer available.');return}void createClient().rpc('send_scheduled_message',{p_post:id,p_text:text}).then(async({error})=>{if(error){showToast(error.code==='P0001'?error.message:'Message could not be sent.');return}void fetch('/api/notifications',{method:'POST'}).catch(()=>undefined);await refreshLive()})},
     joinOpen(){showToast('Go online to find your next meetup.')},
     joinFriend(){if(locationStatus!=='granted'){setLocationPrompt(true);return}void commandLive('search',{p_audience:'friends'}).then(saved=>{if(saved)void commandLive('live',{p_venue:null,p_intent:freeForMin===30?'coffee':freeForMin===60?'lunch':'drink',p_duration:freeForMin})})},
     addFriend(person:Person){showToast('Scan their QR code to send a friend request.')},
@@ -656,7 +740,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
 
   return {
     state: {
-      partnerLocation,creationType,recenterKey,badgeStats,profileStats,audience,memberSettings,blockedCount,trustedEmail,
+      creationType,recenterKey,badgeStats,profileStats,audience,memberSettings,blockedCount,trustedEmail,
       locationStatus,locationPrompt,locationCenter,pushEnabled,pushBusy,availabilityBusy,
       liveMatch,feedbackStatus,
       live: initial,
@@ -667,6 +751,14 @@ function useUpCatchState(initial?: LiveBootstrap) {
       phase,
       freeForMin,
       createStep,
+      createMode,
+      createModeLocked,
+      scheduledBusy,
+      scheduledPostNotice,
+      scheduledPlan,
+      scheduledPlans,
+      scheduledPlanFlash,
+      scheduledMessages,scheduledMessageMap,messageTarget,selectedScheduledPostId,
       draft,
       hosting,
       incoming,

@@ -16,6 +16,7 @@ export function RatingScreen() {
   const lookupVenue=useVenueLookup()
   const [rating, setRating] = useState(0)
   const [met, setMet] = useState<boolean | null>(null)
+  const [noShow, setNoShow] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [again, setAgain] = useState(true)
   const [sharing, setSharing] = useState(false)
@@ -51,9 +52,13 @@ export function RatingScreen() {
           <div className="flex w-full flex-col gap-3 rounded-3xl bg-card p-4 text-left">
             <p className="font-display text-lg font-bold">Did you meet {m.person.name}?</p>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" aria-pressed={met === true} onClick={() => setMet(true)} className={cn('press min-h-12 rounded-2xl font-bold', met === true ? 'bg-primary text-primary-foreground' : 'bg-muted')}>We met</button>
+              <button type="button" aria-pressed={met === true} onClick={() => { setMet(true); setNoShow(false) }} className={cn('press min-h-12 rounded-2xl font-bold', met === true ? 'bg-primary text-primary-foreground' : 'bg-muted')}>We met</button>
               <button type="button" aria-pressed={met === false} onClick={() => setMet(false)} className={cn('press min-h-12 rounded-2xl font-bold', met === false ? 'bg-primary text-primary-foreground' : 'bg-muted')}>We did not meet</button>
             </div>
+            {met === false && <div className="flex flex-col gap-2">
+              <Chip active={noShow} onClick={() => setNoShow((value) => !value)}>{m.person.name} didn't show up</Chip>
+              <p className="text-xs text-muted-foreground">Choose this only if you checked in and they did not arrive.</p>
+            </div>}
           </div>
         ) : (
         <div className="flex gap-1" role="radiogroup" aria-label="Rating">
@@ -119,7 +124,7 @@ export function RatingScreen() {
         </>}
       </div>
       <footer className="flex flex-col gap-2 px-6 pt-3 pb-safe">
-        <PrimaryButton onClick={() => state.live ? actions.submitFeedback(missed ? null : rating, missed ? met : null) : actions.submitRating(rating || 5)} disabled={missed ? met === null : !rating} className="w-full">
+        <PrimaryButton onClick={() => state.live ? actions.submitFeedback(missed ? null : rating, missed ? met : null, missed && noShow) : actions.submitRating(rating || 5)} disabled={missed ? met === null : !rating} className="w-full">
           Submit
         </PrimaryButton>
         {!state.live && <button type="button" onClick={() => actions.submitRating(5)} className="press mb-2 min-h-11 text-sm font-semibold text-muted-foreground">
@@ -165,4 +170,26 @@ export function MatchOverlay() {
       </div>
     </div>
   )
+}
+
+export function ScheduledPairOverlay() {
+  const { state } = useUpCatch()
+  const plan = state.scheduledPlanFlash
+  if (!plan) return null
+  const initials = plan.partner_name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || '?'
+  return <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center gap-6 bg-primary px-6 text-primary-foreground animate-in fade-in duration-200" role="status">
+    <div className="relative grid place-items-center">
+      <span className="uc-ping is-live" aria-hidden="true" />
+      <span className="uc-ping is-live" aria-hidden="true" />
+      <div className="flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={state.user.photo ?? '/placeholder-user.jpg'} alt="" className="uc-pop size-28 rounded-full border-4 border-live object-cover" />
+        <span className="uc-pop -ml-8 grid size-28 place-items-center rounded-full border-4 border-live bg-card font-display text-3xl font-extrabold text-foreground" style={{ animationDelay: '150ms' }}>{initials}</span>
+      </div>
+    </div>
+    <div className="text-center">
+      <p className="font-display text-5xl font-extrabold">It's on!</p>
+      <p className="mt-2 text-lg opacity-85">Your invite with {plan.partner_name} is confirmed.</p>
+    </div>
+  </div>
 }

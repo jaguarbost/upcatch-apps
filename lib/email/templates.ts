@@ -1,10 +1,13 @@
-export type EmailKind = 'welcome_email' | 'paired_email' | 'trusted_email'
+export type EmailKind = 'welcome_email' | 'paired_email' | 'feedback_email' | 'trusted_email'
 export type EmailPayload = {
   title?: string
   text?: string
   to?: string
   expires_at?: string
   meetup_id?: string
+  post_id?: string
+  nudge_id?: string
+  route?: string
   partner_name?: string
   venue?: string
 }
@@ -18,8 +21,10 @@ export function notificationEmail(kind: EmailKind, siteOrigin: string, payload: 
   if (origin.protocol !== 'https:' && !(origin.protocol === 'http:' && origin.hostname === 'localhost')) {
     throw new Error('Email links require a trusted HTTPS origin.')
   }
-  const url = origin.origin + '/app'
+  const url = origin.origin + (kind === 'paired_email' ? '/app?view=messages&chat=live' : kind === 'feedback_email' ? '/app?view=meetups' : '/app')
+  const nativeUrl = kind === 'paired_email' ? 'uk.co.upcatch.app://app/messages?chat=live' : kind === 'feedback_email' ? 'uk.co.upcatch.app://app/meetups' : null
   const paired = kind === 'paired_email'
+  const feedback = kind === 'feedback_email'
   const trusted = kind === 'trusted_email'
   const welcome = kind === 'welcome_email'
   const welcomeSteps = [
@@ -29,20 +34,23 @@ export function notificationEmail(kind: EmailKind, siteOrigin: string, payload: 
   ]
   const howItWorksText = welcome ? ['How it works', ...welcomeSteps.map((step, index) => (index + 1) + '. ' + step.title + '\n' + step.text)].join('\n\n') : ''
   const subject = trusted ? (payload.title || 'UpCatch meetup details')
-    : paired ? "You're paired up. Let the hello begin!" : 'Welcome to UpCatch. Your next hello starts here.'
-  const heading = trusted ? 'A little peace of mind.' : paired ? 'Two yeses. One new hello.' : 'Less scrolling. More hellos.'
+    : feedback ? 'How was your UpCatch meetup?' : paired ? "You're paired up. Let the hello begin!" : 'Welcome to UpCatch. Your next hello starts here.'
+  const heading = trusted ? 'A little peace of mind.' : feedback ? 'How did it go?' : paired ? 'Two yeses. One new hello.' : 'Less scrolling. More hellos.'
   const intro = trusted ? (payload.text || 'Your contact has shared their UpCatch meetup details with you.')
+    : feedback ? 'Your meetup is complete. Tell us how it went in UpCatch.'
     : paired ? `You and ${payload.partner_name || 'your new catch'} both said yes. Time to take this hello into the real world.`
       : "You're in! Your profile is ready, and your next great conversation could be just around the corner."
   const detail = trusted ? 'These details were shared by your contact. Plans can change; check in with them directly for the latest.'
+    : feedback ? 'Open the app to rate your meetup. Your feedback helps keep the community welcoming.'
     : paired ? (payload.venue ? `The meeting spot: ${payload.venue}. Open UpCatch for the latest plan and to say you're on your way.`
       : "Pick a public meeting spot together in UpCatch, then say you're on your way.")
       : "Got a little free time? Go Live when you're ready. We'll look for someone in your city who's free too. You both get a say before any meetup is confirmed."
-  const label = paired ? 'See your meetup' : 'Find your next hello'
+  const label = feedback ? 'Leave feedback' : paired ? 'See your meetup' : 'Find your next hello'
   const eyebrow = trusted ? 'LOOKING OUT FOR EACH OTHER' : paired ? 'IT’S A CATCH' : 'GOOD TO HAVE YOU HERE'
   const footer = trusted ? 'You received this because an UpCatch member chose you as their trusted contact.'
+    : feedback ? 'You received this because your UpCatch meetup was completed.'
     : paired ? 'You received this because you both accepted an UpCatch meetup.' : 'You received this because you completed your UpCatch profile.'
-  const text = [subject, heading, intro, detail, howItWorksText, trusted ? '' : `${label}: ${url}`, footer].filter(Boolean).join('\n\n')
+  const text = [subject, heading, intro, detail, howItWorksText, trusted ? '' : `${label}: ${url}`, nativeUrl ? `Open in the installed app: ${nativeUrl}` : '', footer].filter(Boolean).join('\n\n')
   const display = "'Bricolage Grotesque',Arial,sans-serif"
   const body = "'Figtree',Arial,sans-serif"
   const howItWorksHtml = welcome ? "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:28px 0 0;background:#2b59ff;border-radius:20px\"><tr><td bgcolor=\"#2b59ff\" style=\"padding:24px;border-radius:20px\"><h2 style=\"margin:0 0 20px;font-family:" + display + ";font-size:26px;line-height:1.2;font-weight:800;color:#ffc940\">How it works</h2><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
@@ -68,7 +76,7 @@ export function notificationEmail(kind: EmailKind, siteOrigin: string, payload: 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:20px;background:#f3f5f8;border:1px solid #dde2ea;border-radius:16px;font-size:15px;line-height:1.6">${escapeHtml(detail)}</td></tr></table>
 ${howItWorksHtml}
 ${trusted ? '' : `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 0"><tr><td bgcolor="#2b59ff" style="border-radius:999px;text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;padding:16px 28px;border:1px solid #2b59ff;border-radius:999px;font-family:${body};font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;mso-padding-alt:16px 28px">${label} &rarr;</a></td></tr></table>
-<p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#5a6475">Button taking a breather? <a href="${escapeHtml(url)}" style="color:#2b59ff;text-decoration:underline">Open UpCatch here</a>.</p>`}
+<p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#5a6475">${nativeUrl ? `<a href="${escapeHtml(nativeUrl)}" style="color:#2b59ff;text-decoration:underline">Open in the installed app</a>. ` : ''}Button taking a breather? <a href="${escapeHtml(url)}" style="color:#2b59ff;text-decoration:underline">Open UpCatch here</a>.</p>`}
 <p style="margin:28px 0 0;font-family:${display};font-size:20px;font-weight:700">See you out there,<br>The UpCatch crew</p></td></tr></table>
 <p style="max-width:480px;margin:22px 12px 0;font-size:12px;line-height:1.6;color:#5a6475">${footer}<br><a href="${escapeHtml(origin.origin + '/privacy')}" style="color:#5a6475">Privacy</a></p>
 </td></tr></table></body></html>`

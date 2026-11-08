@@ -1,6 +1,6 @@
 'use client'
 
-import { CalendarPlus, CalendarCheck2, LoaderCircle, MessageCircle, Zap } from 'lucide-react'
+import { CalendarCheck2, LayoutGrid, LoaderCircle, MessageCircle, Send, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUpCatch, type Tab } from './app-provider'
 
@@ -18,11 +18,11 @@ export function BottomNav() {
         onClick={() => actions.setTab(tab)}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'press relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold',
+          'press relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold min-[375px]:text-[11px]',
           active ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
-        <span className={cn('grid h-8 w-12 place-items-center rounded-full transition-colors', active && 'bg-muted')}>
+        <span className={cn('grid h-8 w-10 place-items-center rounded-full transition-colors min-[375px]:w-12', active && 'bg-muted')}>
           {icon}
         </span>
         {label}
@@ -37,16 +37,14 @@ export function BottomNav() {
       className="pb-safe absolute inset-x-0 bottom-0 z-30 rounded-t-[1.75rem] border-t border-border/60 bg-card/95 px-2 pt-1.5 backdrop-blur-xl"
     >
       <div className="flex items-end">
+        {item('wall', 'Wall', <LayoutGrid className="size-5" aria-hidden="true" />)}
         {item('messages', 'Messages', <MessageCircle className="size-5" aria-hidden="true" />)}
-        <button type="button" onClick={()=>{actions.setTab('map');actions.openCreate()}} aria-label="Create meetup" className="press relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">
-          <span className="grid h-8 w-12 place-items-center rounded-full"><CalendarPlus className="size-5" aria-hidden="true" /></span>
-          Create
-        </button>
 
-        <div className="flex flex-1 justify-center">
-          <div
-            role="status"
-            aria-label={state.availabilityBusy ? 'Updating availability' : online ? 'Online' : 'Offline'}
+        <div className="flex min-w-0 flex-1 justify-center">
+          <button
+            type="button"
+            onClick={() => actions.setTab('map')}
+            aria-label={state.availabilityBusy ? 'Go to availability, updating' : online ? 'Go to availability, online' : 'Go to availability, offline'}
             className={cn(
               '-mt-7 mb-1 flex size-16 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-bold shadow-xl ring-4 ring-card transition-colors',
               online ? 'bg-live text-live-foreground shadow-live/40' : 'bg-primary text-primary-foreground shadow-primary/40',
@@ -54,9 +52,10 @@ export function BottomNav() {
           >
             {state.availabilityBusy ? <LoaderCircle className="size-6 animate-spin" aria-hidden="true" /> : <Zap className="size-6" strokeWidth={2.5} aria-hidden="true" fill={online ? "currentColor" : "none"} />}
             {state.availabilityBusy ? 'Wait...' : online ? 'Online' : 'Offline'}
-          </div>
+          </button>
         </div>
 
+        {item('nudges', 'Nudge', <Send className="size-5" aria-hidden="true" />)}
         {item('meetups', 'Meetups', <CalendarCheck2 className="size-5" aria-hidden="true" />)}
         {item(
           'profile',

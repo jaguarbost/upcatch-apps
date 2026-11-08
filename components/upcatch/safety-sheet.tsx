@@ -33,7 +33,7 @@ export function SafetySheet({ kind, onClose, partnerName }: { kind: SheetKind; o
           <div className="flex flex-col gap-3 px-5 pt-4 pb-6">
             <p className="flex items-start gap-2 rounded-2xl bg-primary/10 p-3 text-sm leading-relaxed text-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-              Your exact location is never shared. {partnerName} {state.live ? 'only sees your arrival confirmation and the public venue.' : 'only sees your approximate progress and the public venue.'}
+              Your location is never shared with other members. {partnerName} only sees your arrival confirmation and the public venue you agree on.
             </p>
             <div className="flex items-center gap-3 rounded-2xl bg-muted p-3">
               <Share2 className="size-5" aria-hidden="true" />
@@ -71,7 +71,7 @@ export function SafetySheet({ kind, onClose, partnerName }: { kind: SheetKind; o
           <div className="flex flex-col gap-4 px-5 pt-4 pb-6">
             <p className="text-sm text-muted-foreground">
               {view === 'cancel'
-                ? state.live ? 'Cancelling releases this meetup for both people.' : `We’ll let ${partnerName} know kindly. Cancelling early keeps your reliability score healthy.`
+                ? 'Cancelling after pairing will lower your show-up score. Repeated cancellations may limit future meetups on UpCatch. Your partner will see that this meetup was cancelled.'
                 : state.live ? 'Reports are private and saved for review.' : 'Reports are private and reviewed by our safety team within minutes.'}
             </p>
             <div className="flex flex-wrap gap-2">
@@ -83,7 +83,7 @@ export function SafetySheet({ kind, onClose, partnerName }: { kind: SheetKind; o
             </div>
             <PrimaryButton
               variant={view === 'report' ? 'ink' : 'danger'}
-              disabled={!reason}
+              disabled={view==='report' && !reason}
               onClick={() => {
                 onClose()
                 if(state.live && view==='report'){actions.reportMeetup(reason??'Other');return}
@@ -95,6 +95,7 @@ export function SafetySheet({ kind, onClose, partnerName }: { kind: SheetKind; o
             >
               {view === 'cancel' ? 'Cancel UpCatch' : 'Send report & leave'}
             </PrimaryButton>
+            {view === 'cancel' && <button type="button" onClick={onClose} className="press min-h-12 w-full rounded-2xl bg-muted text-sm font-bold">Keep meetup</button>}
           </div>
         )}
       </BottomSheet>

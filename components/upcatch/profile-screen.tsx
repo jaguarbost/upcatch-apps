@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Trophy,
   Users,
+  Send,
   UserX,
   Zap,
 } from 'lucide-react'
@@ -137,6 +138,7 @@ export function ProfileScreen() {
             <Globe2 className="size-3.5" aria-hidden="true" /> Any distance
           </span>
         </div>
+        <button type="button" onClick={() => actions.setTab('nudges')} className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground"><Send className="size-4" aria-hidden="true" /> Nudge friends</button>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"

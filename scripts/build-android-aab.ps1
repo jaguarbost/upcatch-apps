@@ -1,5 +1,6 @@
 param(
-  [string]$KeyDirectory = (Join-Path $env:USERPROFILE 'UpCatch-release-keys')
+  [string]$KeyDirectory = (Join-Path $env:USERPROFILE 'UpCatch-release-keys'),
+  [switch]$Offline
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,7 +71,9 @@ try {
 
   Push-Location $androidRoot
   try {
-    & .\gradlew.bat bundleRelease --quiet
+    $gradleArgs = @('bundleRelease', '--quiet')
+    if ($Offline) { $gradleArgs += '--offline' }
+    & .\gradlew.bat @gradleArgs
     if ($LASTEXITCODE -ne 0) { throw 'Android release bundle build failed.' }
   } finally { Pop-Location }
 

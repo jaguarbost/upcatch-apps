@@ -6,6 +6,7 @@ import { LogoMark } from '@/components/upcatch/brand-badge'
 import { PrimaryButton } from '@/components/upcatch/primitives'
 import { createNativeRuntime } from '@/lib/native/runtime'
 import type { NativeAuthReturn } from '@/lib/native/return-links'
+import { parseUpCatchAppLink } from '@/lib/app-links'
 import type { LiveBootstrap } from '@/lib/live-model'
 import { listenForNativePushTaps } from '@/lib/push-client'
 import { App } from '@capacitor/app'
@@ -50,6 +51,7 @@ function NativeClient() {
   const [startupChecked, setStartupChecked] = useState(false)
   const [epoch, setEpoch] = useState(0)
   const renderedMember = useRef<string | null>(null)
+  const pendingAppPath = useRef<string | null>(null)
 
   useEffect(() => {
     const update = () => setPath(window.location.pathname)
@@ -72,7 +74,9 @@ function NativeClient() {
       renderedMember.current = initial.memberId
       setEpoch(value => value + 1)
     }
-    navigate(initial.completed ? '/app' : '/onboarding', true)
+    const destination = initial.completed ? pendingAppPath.current ?? '/app' : '/onboarding'
+    if (initial.completed) pendingAppPath.current = null
+    navigate(destination, true)
   }, [])
 
   const showLoadError = useCallback(async (active: Runtime | null, error: unknown) => {
@@ -91,6 +95,7 @@ function NativeClient() {
     let releaseLinks: () => Promise<void> = () => Promise.resolve()
     let releasePush: () => void = () => undefined
     let releaseResume: () => Promise<void> = () => Promise.resolve()
+    let releaseAppLinks: () => Promise<void> = () => Promise.resolve()
     let active: Runtime | null = null
     const refresh = (active: Runtime) => {
       void loadMember(active).catch(error => { void showLoadError(active, error) })
@@ -122,6 +127,19 @@ function NativeClient() {
           if (!mounted) return
           void showLoadError(current, error)
         })
+        const openAppLink = (raw: string) => {
+          const destination = parseUpCatchAppLink(raw)
+          if (!destination || !mounted) return
+          pendingAppPath.current = destination
+          if (renderedMember.current) {
+            navigate(destination, true)
+            setEpoch(value => value + 1)
+          }
+        }
+        const appLinkListener = await App.addListener('appUrlOpen', event => openAppLink(event.url))
+        releaseAppLinks = () => appLinkListener.remove()
+        const launchLink = await App.getLaunchUrl()
+        if (launchLink?.url) openAppLink(launchLink.url)
         const reload = () => refresh(current)
         window.addEventListener('upcatch:native-reload', reload)
         window.addEventListener('upcatch:native-signout', reload)
@@ -134,7 +152,14 @@ function NativeClient() {
           await resume.remove()
         }
         // A stalled notification SDK must not hold up account restoration.
-        void listenForNativePushTaps(() => refresh(current)).then(release => {
+        void listenForNativePushTaps((route, chat, post) => {
+          if (route === 'wall' || route === 'nudges') openAppLink(`uk.co.upcatch.app://app/${route}`)
+          if (route === 'messages') {
+            const query = chat === 'scheduled' && post ? `?chat=scheduled&post=${encodeURIComponent(post)}` : '?chat=live'
+            openAppLink(`uk.co.upcatch.app://app/messages${query}`)
+          }
+          void refresh(current)
+        }).then(release => {
           if (mounted) releasePush = release
           else release()
         }).catch(() => undefined)
@@ -151,7 +176,7 @@ function NativeClient() {
     })()
     return () => {
       mounted = false
-      releasePush(); void releaseResume(); void releaseLinks(); releaseImages(); releaseApi()
+      releasePush(); void releaseResume(); void releaseAppLinks(); void releaseLinks(); releaseImages(); releaseApi()
       setNativeRuntime(null); setNativeSupabaseClient(null)
     }
   }, [loadMember, showLoadError])

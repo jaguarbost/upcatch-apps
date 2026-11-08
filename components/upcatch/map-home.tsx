@@ -57,7 +57,7 @@ export function MapHome() {
           type="button"
           aria-label="Recenter map"
           onClick={actions.recenterMap}
-          className="press pointer-events-auto mr-14 grid size-12 place-items-center rounded-full bg-card/95 shadow-lg shadow-foreground/10 backdrop-blur"
+          className="press pointer-events-auto mr-28 grid size-12 place-items-center rounded-full bg-card/95 shadow-lg shadow-foreground/10 backdrop-blur"
         >
           <LocateFixed className="size-5" aria-hidden="true" />
         </button>
@@ -90,7 +90,7 @@ export function MapHome() {
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <h2 className="font-display text-3xl leading-none font-extrabold">
-                  {free ? 'You’re free' : 'I’m free now'}
+                  {free ? 'You’re free' : 'Are you free?'}
                 </h2>
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
                   {state.availabilityBusy ? (
@@ -100,9 +100,10 @@ export function MapHome() {
                   ) : 'Go visible to verified people nearby'}
                 </p>
               </div>
-              <Switch checked={free} onChange={actions.setFree} label="I’m free now" size="lg" disabled={state.availabilityBusy} />
+              <Switch checked={free} onChange={actions.setFree} label="Are you free?" size="lg" disabled={state.availabilityBusy} />
             </div>
 
+            <p className="mt-3 text-xs text-muted-foreground">Your location is never shared with other members.</p>
             <div className="mt-4 flex items-center gap-2">
               <span className="text-sm font-semibold text-muted-foreground">For</span>
               <div className="flex flex-1 gap-1 rounded-2xl bg-muted p-1" role="radiogroup" aria-label="Free for">

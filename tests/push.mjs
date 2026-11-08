@@ -110,11 +110,12 @@ test('native push binds the authenticated alias and disconnects on sign-out',asy
  assert.deepEqual(calls,[['initialize','test-app'],['login','opaque-alias'],['optIn'],['optOut'],['logout']])
 })
 
-test('native push taps open only the internal app route',async t=>{
+test('native push taps accept only known internal destinations',async t=>{
  const previous=process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
  process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID='test-app'
  t.after(()=>{if(previous===undefined)delete process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;else process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID=previous})
- let click,removed,opens=0
+ let click,removed
+ const opens=[]
  const client={initialize:async()=>{},Notifications:{
   addEventListener:(_event,handler)=>{click=handler},
   removeEventListener:(_event,handler)=>{removed=handler},
@@ -124,10 +125,12 @@ test('native push taps open only the internal app route',async t=>{
   '@onesignal/capacitor-plugin':{__esModule:true,default:client},
   './browser-permissions':{deviceKind:()=> 'android',isInstalledApp:()=>true},
  })
- const stop=await api.listenForNativePushTaps(()=>{opens++})
+ const stop=await api.listenForNativePushTaps(route=>{opens.push(route)})
  click({notification:{additionalData:{route:'https://evil.example'}}})
  click({notification:{additionalData:{route:'app'}}})
- assert.equal(opens,1)
+ click({notification:{additionalData:{route:'wall'}}})
+ click({notification:{additionalData:{route:'nudges'}}})
+ assert.deepEqual(opens,['app','wall','nudges'])
  stop()
  assert.equal(removed,click)
 })

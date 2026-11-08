@@ -10,7 +10,7 @@ async function beginDelivery(job: Job) {
   if(error)throw new Error('Could not record provider attempt')
   if(!data)throw new ReplayExpired('Provider replay window expired; manual review required')
 }
-type Job = { id: string; user_id: string; kind: 'welcome_email' | 'paired_email' | 'welcome_push' | 'meetup_push' | 'trusted_email' | 'friend_push'; payload?: EmailPayload; lease_token: string; created_at: string }
+type Job = { id: string; user_id: string; kind: 'welcome_email' | 'paired_email' | 'feedback_email' | 'welcome_push' | 'meetup_push' | 'trusted_email' | 'friend_push'; payload?: EmailPayload; lease_token: string; created_at: string }
 export function pushAlias(userId: string) {
   const secret = process.env.ONESIGNAL_ALIAS_SECRET
   if (!secret || secret.length < 32) throw new Error('Push alias secret must have at least 32 characters.')
@@ -24,12 +24,18 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
   if(error) throw new Error('Notification recipient unavailable')
   if(!user?.email_confirmed_at) return 'skipped'
   if(job.payload?.expires_at && Date.parse(job.payload.expires_at)<=Date.now())return 'skipped'
-  if(job.kind === 'welcome_email' || job.kind === 'paired_email' || job.kind === 'trusted_email') {
+  if(job.kind === 'welcome_email' || job.kind === 'paired_email' || job.kind === 'feedback_email' || job.kind === 'trusted_email') {
     if(job.kind === 'paired_email') {
       if(!job.payload?.meetup_id) return 'skipped'
       const {data:meetup,error:meetupError}=await admin.from('meetups').select('status,ends_at').eq('id',job.payload.meetup_id).maybeSingle()
       if(meetupError) throw new Error('Meetup details unavailable')
       if(!meetup || meetup.status!=='confirmed' || Date.parse(meetup.ends_at)<=Date.now()) return 'skipped'
+    }
+    if(job.kind === 'feedback_email') {
+      if(!job.payload?.meetup_id) return 'skipped'
+      const {data:meetup,error:meetupError}=await admin.from('meetups').select('status').eq('id',job.payload.meetup_id).maybeSingle()
+      if(meetupError) throw new Error('Meetup details unavailable')
+      if(meetup?.status!=='completed') return 'skipped'
     }
     if(!process.env.RESEND_API_KEY) throw new Error('Email delivery not configured')
     const email = notificationEmail(job.kind, siteUrl(), job.payload)
@@ -37,11 +43,22 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     const result = await fetch('https://api.resend.com/emails', {
       method:'POST', signal:AbortSignal.timeout(8000),
       headers:{ Authorization:'Bearer '+process.env.RESEND_API_KEY, 'Content-Type':'application/json', 'Idempotency-Key':job.id },
-      body:JSON.stringify({from:'UpCatch <hello@upcatch.co.uk>',to:[job.kind==='trusted_email'?job.payload?.to:user.email],
+      body:JSON.stringify({from:process.env.EMAIL_FROM || 'UpCatch <hello@upcatch.uk>',to:[job.kind==='trusted_email'?job.payload?.to:user.email],
         ...email}),
     })
     if(!result.ok) throw new Error('Email provider returned '+result.status)
     return 'sent'
+  }
+  if(job.payload?.route==='wall' && job.payload.post_id) {
+    const {data:active,error:postError}=await admin.rpc('scheduled_post_push_active',{p_post:job.payload.post_id})
+    if(postError) throw new Error('Scheduled post unavailable')
+    if(!active) return 'skipped'
+  }
+  if(job.payload?.route==='nudges') {
+    if(!job.payload.nudge_id) return 'skipped'
+    const {data:active,error:nudgeError}=await admin.rpc('friend_nudge_push_active',{p_nudge:job.payload.nudge_id})
+    if(nudgeError) throw new Error('Friend nudge unavailable')
+    if(!active) return 'skipped'
   }
   const {data:prefs,error:prefsError}=await admin.from('notification_preferences').select('push_enabled').eq('user_id',job.user_id).single()
   if(prefsError) throw new Error('Push preferences unavailable')
@@ -56,11 +73,9 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     body:JSON.stringify({app_id:process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID,
       include_aliases:{external_id:[pushAlias(job.user_id)]},target_channel:'push',idempotency_key:job.id,
       headings:{en:job.payload?.title??'Welcome to UpCatch'},contents:{en:job.payload?.text??'Your profile is ready. Say hello to someone new.'},
-      web_url:siteUrl()+'/app',
-      data:{route:'app'},
-      small_icon:'ic_stat_upcatch',
-      android_accent_color:'2B59FF',
-      ttl}),
+      url:siteUrl()+(job.payload?.route==='wall'?'/app?view=wall':job.payload?.route==='nudges'?'/app?view=nudges':job.kind==='meetup_push'?'/app?view=messages&chat=live':'/app'),
+      ...(job.payload?.route==='nudges'?{app_url:'uk.co.upcatch.app://app/nudges'}:{}),
+      data:{route:job.payload?.route==='wall'?'wall':job.payload?.route==='nudges'?'nudges':'app'},ttl}),
   })
   if(!result.ok) throw new Error('Push provider returned '+result.status)
   const body=await result.json()

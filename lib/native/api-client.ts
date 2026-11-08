@@ -88,4 +88,7 @@ export class MobileApi {
     const query = `id=${encodeURIComponent(id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
     return (await this.request(`friend-photo?${query}`)).blob()
   }
+  async wallPhoto(postId: string) {
+    return (await this.request(`wall-photo?post=${encodeURIComponent(postId)}`)).blob()
+  }
 }

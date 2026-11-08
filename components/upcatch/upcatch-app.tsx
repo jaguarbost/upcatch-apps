@@ -2,7 +2,7 @@
 
 import styles from './desktop.module.css'
 import { BrandBadge } from './brand-badge'
-import { AlertsButton } from './alerts-button'
+import { AlertsButton, MessagesButton } from './alerts-button'
 import { LocationPermission } from './location-permission'
 import { InstallAppProvider } from '@/components/account/install-app'
 import { HowItWorksProvider } from './how-it-works'
@@ -20,12 +20,13 @@ import { LiveFriendsSheet } from './live-friends-sheet'
 import { LiveMeetup } from './live-meetup'
 import type { MapMode } from './map-canvas'
 import { MapHome } from './map-home'
-import { MeetupsScreen } from './meetups-screen'
+import { MeetupsScreen, WallScreen } from './meetups-screen'
 import { MessagesScreen } from './messages-screen'
+import { NudgeFriendsScreen } from './nudge-friends-screen'
 import { Onboarding } from './onboarding'
 import { ProfileScreen } from './profile-screen'
 import { PushOptInPrompt } from './push-opt-in-prompt'
-import { MatchOverlay, RatingScreen } from './rating-screen'
+import { MatchOverlay, RatingScreen, ScheduledPairOverlay } from './rating-screen'
 import { WaitingPanel } from './waiting-panel'
 
 const MapCanvas = dynamic(() => import('./map-canvas'), {
@@ -74,7 +75,6 @@ function Shell() {
     <>
       <div className="absolute inset-0 z-0">
         <MapCanvas
-          partner={state.partnerLocation}
           recenterKey={state.recenterKey}
           center={state.locationCenter}
           hideUserLocation={Boolean(state.live && !state.locationCenter)}
@@ -89,10 +89,7 @@ function Shell() {
             !state.live && inJourney && state.meetup
               ? {
                   venue: lookupVenue(state.meetup.venueId),
-                  themStart: state.meetup.person.approx,
-                  themInitials: state.meetup.person.initials,
                   meProgress: state.progress.me,
-                  themProgress: state.progress.them,
                 }
               : undefined
           }
@@ -106,14 +103,17 @@ function Shell() {
       {state.tab === 'messages' && !picking && <MessagesScreen />}
       {state.tab === 'activity' && !picking && <ActivityScreen />}
       {state.tab === 'meetups' && !picking && <MeetupsScreen />}
+      {state.tab === 'wall' && !picking && <WallScreen />}
       {state.tab === 'profile' && !picking && <ProfileScreen />}
+      {state.tab === 'nudges' && !picking && <NudgeFriendsScreen />}
 
       {state.createStep > 0 && <CreateFlow />}
       {state.createStep === 0 && state.phase !== 'rating' && <BottomNav />}
       {state.phase === 'rating' && <RatingScreen />}
       {state.tab==='map' && inJourney && state.createStep===0 && <div className="absolute left-4 top-[max(env(safe-area-inset-top),1rem)] z-35 hidden lg:block"><BrandBadge /></div>}
-      {state.createStep===0 && state.phase!=='rating' && <AlertsButton />}
+      {state.createStep===0 && state.phase!=='rating' && <><MessagesButton /><AlertsButton /></>}
       <MatchOverlay />
+      <ScheduledPairOverlay />
       {state.live && state.locationPrompt && <LocationPermission />}
       {state.friendsSheet && (state.live ? <LiveFriendsSheet key={state.friendsSheet.mode} /> : <FriendsSheet key={`${state.friendsSheet.mode}-${state.friendsSheet.target.id}`} />)}
       {state.tab === 'map' && !state.friendsSheet && <FriendAlert />}

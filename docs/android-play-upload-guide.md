@@ -1,12 +1,12 @@
 # UpCatch — Google Play upload guide
 
-**Updated 1 November 2026.** Use this as the working sheet for the Android release. It records what is in this workspace; it is not evidence that Google Play has accepted a release.
+**Updated 8 November 2026.** Use this as the working sheet for the Android release. It records what is in this workspace; it is not evidence that Google Play has accepted a release.
 
 ## What Play Console is asking for
 
 The **App bundles → Upload app bundles** box expects a **signed Android App Bundle (`.aab`)**. The installed `app-debug.apk` is for phone testing and is **not** the file to upload. The “2 of 3 enhancements active” message is a Play App Signing status indicator, not the bundle file itself. [Google's release instructions](https://support.google.com/googleplay/android-developer/answer/9859348) and [Play App Signing guide](https://support.google.com/googleplay/android-developer/answer/9842756) explain these steps.
 
-**Current status (1 November 2026):** A new signed `.aab` with version code `3` has been built and its JAR signature verified. The user reports that an earlier bundle went into testing and now wants to create a Production release; the Play library and track state have not been independently verified. Google sign-in return, push delivery, location, and the full two-account meetup flow still need testing on a Play-installed build before Production rollout.
+**Current status (8 November 2026):** A signed `.aab` with version code `4` and version name `2.0.0` has been built and its JAR signature verified. The Play library and track state have not been independently verified. The current source fails typecheck and Next build on a map prop mismatch. Device notification, Wall, scheduled chat, cancellation, and app-link checks remain unverified. Do not submit this candidate until those checks pass.
 
 ## Values to check in Play Console
 
@@ -15,8 +15,8 @@ The **App bundles → Upload app bundles** box expects a **signed Android App Bu
 | App type | App | Choose **App**, not Game. |
 | Store name | UpCatch (draft) | The visible store name can differ from the identifier. |
 | Package name | `uk.co.upcatch.app` | Must match the Play app record before its first bundle upload. This is the permanent Android identity. |
-| Version name | `1.1.2` | `package.json` and `android/app/build.gradle`. |
-| Version code | `3` | `android/app/build.gradle`. This must be higher than the app's existing active code in Play. |
+| Version name | `2.0.0` | `package.json` and `android/app/build.gradle`. |
+| Version code | `4` | `android/app/build.gradle`. This must be higher than the app's existing active code in Play. |
 | Minimum Android version | Android 7.0 / API 24 | `android/variables.gradle`. |
 | Target API | API 36 | `android/variables.gradle`; recheck Play's current target API rule when uploading. |
 | Release track | Production draft requested | Finish phone acceptance checks before rollout. |
@@ -35,7 +35,7 @@ The **App bundles → Upload app bundles** box expects a **signed Android App Bu
 | Privacy policy | `https://www.upcatch.uk/privacy` | Check that the live page is complete and accurate before submission. |
 | Terms | `https://www.upcatch.uk/terms` | Check the live page. |
 | Phone screenshots | Capture from the final installed app | Still needed. Include login, Go Live, an offer, a confirmed meetup, and profile where possible; hide real member details. |
-| Signed app bundle | `android/app/build/outputs/bundle/release/app-release.aab` | **Ready locally:** 22,232,442 bytes; SHA-256 `E8C8FEFBCF8128E68FA93C4E0131E196925E7D2038035C9DC1C5AE46B021DEF8`. Code `3`; Play validation pending. |
+| Signed app bundle | `android/app/build/outputs/bundle/release/app-release.aab` | **Built locally:** 22,238,190 bytes; SHA-256 `8682C222DBF9D01B23289A8345DAC9DC199A0835F62A203F60A12F5361F2E230`. Code `4`; release checks remain open. |
 
 Google's [preview asset requirements](https://support.google.com/googleplay/android-developer/answer/9866151) apply to the icon, graphic, and screenshots. The prepared PNG dimensions were checked locally. Screenshots must match the shipped interface; do not use mockup data as proof of actual meetups.
 
@@ -48,7 +48,7 @@ Google's [preview asset requirements](https://support.google.com/googleplay/andr
 5. Build the signed release bundle with Gradle's `bundleRelease` task. Verify the output at `android/app/build/outputs/bundle/release/app-release.aab`, its package ID, version code, certificate, and SHA-256 hash. Do not upload if the bundle is unsigned or the package ID differs from the Play record.
 6. If Google sign-in or other Google services use an Android OAuth client, check its package name and the **Play app signing certificate** fingerprints after Play processes the bundle. The Play-installed app may have a different signature from a local debug install.
 
-The current Gradle project reads those four signing variables in `android/app/build.gradle`. The build script `scripts/build-android-aab.ps1` created a private upload key and password file in `C:\Users\dipti\UpCatch-release-keys`, outside this project, and reuses them on later runs. **Back up both files together in a secure place.** Do not upload the debug APK in place of the AAB. The new release bundle's merged manifest reports package `uk.co.upcatch.app`, version code `3`, version name `1.1.2`, and target API `36`.
+The current Gradle project reads those four signing variables in `android/app/build.gradle`. The build script `scripts/build-android-aab.ps1` created a private upload key and password file in `C:\Users\dipti\UpCatch-release-keys`, outside this project, and reuses them on later runs. **Back up both files together in a secure place.** Do not upload the debug APK in place of the AAB. The new release bundle's merged manifest reports package `uk.co.upcatch.app`, version code `4`, version name `2.0.0`, and target API `36`.
 
 ## Upload in Play Console
 
@@ -70,4 +70,4 @@ The current Gradle project reads those four signing variables in `android/app/bu
 
 ## Immediate next action
 
-Upload the new signed bundle at `android/app/build/outputs/bundle/release/app-release.aab` to the **Production** draft and confirm it appears under **Added** as version code `3`. If Play says code `3` is already used or below an active bundle, check **App bundle explorer** for the highest code before creating another build. Back up the upload key and password file, and test the Play-installed build before Production rollout.
+Resolve the typecheck failure, verify the requested flows on Android and iOS devices, and compare Play's highest existing version code with `4`. Keep the signed AAB in this workspace until release acceptance passes. Back up the upload key and password file together.

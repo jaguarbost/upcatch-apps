@@ -80,7 +80,7 @@ export function ActivityScreen() {
                   }}
                   className="flex-1 text-base"
                 >
-                  I’m free now
+                  Are you free?
                 </PrimaryButton>
                 <PrimaryButton onClick={actions.openCreate} className="flex-1 text-base">
                   Create
