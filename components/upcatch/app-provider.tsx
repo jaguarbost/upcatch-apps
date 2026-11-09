@@ -18,7 +18,7 @@ import {
 } from '@/lib/upcatch-data'
 
 export type Phase = 'idle' | 'free' | 'hosting' | 'live' | 'arrived' | 'rating'
-export type Tab = 'map' | 'wall' | 'messages' | 'activity' | 'meetups' | 'profile' | 'nudges'
+export type Tab = 'map' | 'wall' | 'messages' | 'activity' | 'meetups' | 'profile' | 'nudges' | 'notifications'
 
 export interface UserProfile {
   name: string
@@ -139,6 +139,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
   const [scheduledMessageMap, setScheduledMessageMap] = useState<Record<string,Message[]>>({})
   const [messageTarget, setMessageTarget] = useState<'live' | 'scheduled' | null>(null)
   const [selectedScheduledPostId, setSelectedScheduledPostId] = useState<string | null>(null)
+  const [friendChatId, setFriendChatId] = useState<string | null>(null)
   useEffect(()=>{
     if(window.location.pathname!=='/app')return
     const params=new URLSearchParams(window.location.search)
@@ -148,7 +149,8 @@ function useUpCatchState(initial?: LiveBootstrap) {
       const chat=params.get('chat')
       setMessageTarget(chat==='live'?'live':chat==='scheduled'?'scheduled':null)
       setSelectedScheduledPostId(chat==='scheduled'?params.get('post'):null)
-    }else if(view==='meetups'||view==='wall'||view==='nudges')setTab(view)
+      setFriendChatId(chat==='friend'?params.get('peer'):null)
+    }else if(view==='meetups'||view==='wall'||view==='nudges'||view==='notifications')setTab(view)
   },[])
   const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT)
   const [hosting, setHosting] = useState<Draft | null>(null)
@@ -270,11 +272,12 @@ function useUpCatchState(initial?: LiveBootstrap) {
       },
       setTab(t: Tab) {
         haptic('tap')
-        if(t==='messages'){setMessageTarget(null);setSelectedScheduledPostId(null)}
+        if(t==='messages'){setMessageTarget(null);setSelectedScheduledPostId(null);setFriendChatId(null)}
         setTab(t)
       },
-      openMessages(target:'live'|'scheduled',postId?:string){setMessageTarget(target);setSelectedScheduledPostId(postId??null);setTab('messages')},
-      closeMessages(){setMessageTarget(null);setSelectedScheduledPostId(null)},
+      openMessages(target:'live'|'scheduled',postId?:string){setMessageTarget(target);setSelectedScheduledPostId(postId??null);setFriendChatId(null);setTab('messages')},
+      openFriendChat(friendId:string){setMessageTarget(null);setSelectedScheduledPostId(null);setFriendChatId(friendId);setTab('messages')},
+      closeMessages(){setMessageTarget(null);setSelectedScheduledPostId(null);setFriendChatId(null)},
       setFree(on: boolean) {
         setPhase(on ? 'free' : 'idle')
         if (!on) setIncoming(null)
@@ -758,7 +761,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
       scheduledPlan,
       scheduledPlans,
       scheduledPlanFlash,
-      scheduledMessages,scheduledMessageMap,messageTarget,selectedScheduledPostId,
+      scheduledMessages,scheduledMessageMap,messageTarget,selectedScheduledPostId,friendChatId,
       draft,
       hosting,
       incoming,

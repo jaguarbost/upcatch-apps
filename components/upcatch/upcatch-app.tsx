@@ -23,6 +23,7 @@ import { MapHome } from './map-home'
 import { MeetupsScreen, WallScreen } from './meetups-screen'
 import { MessagesScreen } from './messages-screen'
 import { NudgeFriendsScreen } from './nudge-friends-screen'
+import { NotificationsScreen } from './notifications-screen'
 import { Onboarding } from './onboarding'
 import { ProfileScreen } from './profile-screen'
 import { PushOptInPrompt } from './push-opt-in-prompt'
@@ -89,7 +90,10 @@ function Shell() {
             !state.live && inJourney && state.meetup
               ? {
                   venue: lookupVenue(state.meetup.venueId),
+                  themStart: state.meetup.person.approx,
+                  themInitials: state.meetup.person.initials,
                   meProgress: state.progress.me,
+                  themProgress: state.progress.them,
                 }
               : undefined
           }
@@ -106,12 +110,13 @@ function Shell() {
       {state.tab === 'wall' && !picking && <WallScreen />}
       {state.tab === 'profile' && !picking && <ProfileScreen />}
       {state.tab === 'nudges' && !picking && <NudgeFriendsScreen />}
+      {state.tab === 'notifications' && !picking && <NotificationsScreen />}
 
       {state.createStep > 0 && <CreateFlow />}
       {state.createStep === 0 && state.phase !== 'rating' && <BottomNav />}
       {state.phase === 'rating' && <RatingScreen />}
       {state.tab==='map' && inJourney && state.createStep===0 && <div className="absolute left-4 top-[max(env(safe-area-inset-top),1rem)] z-35 hidden lg:block"><BrandBadge /></div>}
-      {state.createStep===0 && state.phase!=='rating' && <><MessagesButton /><AlertsButton /></>}
+      {state.createStep===0 && state.phase!=='rating' && state.tab!=='notifications' && <><MessagesButton /><AlertsButton /></>}
       <MatchOverlay />
       <ScheduledPairOverlay />
       {state.live && state.locationPrompt && <LocationPermission />}

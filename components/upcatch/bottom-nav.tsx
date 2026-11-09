@@ -1,6 +1,6 @@
 'use client'
 
-import { CalendarCheck2, LayoutGrid, LoaderCircle, MessageCircle, Send, Zap } from 'lucide-react'
+import { CalendarCheck2, LayoutGrid, LoaderCircle, Send, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUpCatch, type Tab } from './app-provider'
 
@@ -38,7 +38,6 @@ export function BottomNav() {
     >
       <div className="flex items-end">
         {item('wall', 'Wall', <LayoutGrid className="size-5" aria-hidden="true" />)}
-        {item('messages', 'Messages', <MessageCircle className="size-5" aria-hidden="true" />)}
 
         <div className="flex min-w-0 flex-1 justify-center">
           <button

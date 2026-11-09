@@ -11,7 +11,7 @@ export function parseUpCatchAppLink(raw: string): string | null {
   } else if (url.origin !== PUBLIC_ORIGIN || url.pathname !== '/app') return null
 
   const view = url.protocol === NATIVE_SCHEME ? url.pathname.slice(1) : url.searchParams.get('view')
-  if (view !== 'messages' && view !== 'meetups' && view !== 'wall' && view !== 'nudges') return null
+  if (view !== 'messages' && view !== 'meetups' && view !== 'wall' && view !== 'nudges' && view !== 'notifications') return null
   const params = new URLSearchParams({ view })
   if (view === 'messages') {
     const chat = url.searchParams.get('chat')
@@ -21,6 +21,11 @@ export function parseUpCatchAppLink(raw: string): string | null {
       if (!post || !UUID.test(post)) return null
       params.set('chat', 'scheduled')
       params.set('post', post)
+    } else if (chat === 'friend') {
+      const peer = url.searchParams.get('peer')
+      if (!peer || !UUID.test(peer)) return null
+      params.set('chat', 'friend')
+      params.set('peer', peer)
     }
   }
   return '/app?' + params.toString()

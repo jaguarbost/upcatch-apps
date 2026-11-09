@@ -5,25 +5,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useUpCatch } from './app-provider'
 import { PersonAvatar, PrimaryButton } from './primitives'
-
-type Nudge = { id: string; sender_id: string; sender_name: string; created_at: string }
+import { useFriendNudges } from './use-friend-nudges'
 
 export function NudgeFriendsScreen() {
   const { state, actions } = useUpCatch()
-  const [nudges, setNudges] = useState<Nudge[]>([])
+  const {nudges, loading: nudgeLoading, error: nudgeError, dismiss}=useFriendNudges(Boolean(state.live))
   const [nearbyIds, setNearbyIds] = useState<Set<string> | null>(null)
-  const [loading, setLoading] = useState(Boolean(state.live))
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
 
   const refresh = useCallback(async () => {
-    if (!state.live) { setNearbyIds(new Set()); setLoading(false); return }
-    const client = createClient()
-    const [requests, nearby] = await Promise.all([client.rpc('my_friend_nudges'), client.rpc('nearby_nudge_friends')])
-    if (requests.error || nearby.error) { setNearbyIds(null); setNotice(requests.error?.code === 'PGRST202' || nearby.error?.code === 'PGRST202'
+    if (!state.live) { setNearbyIds(new Set()); return }
+    const nearby = await createClient().rpc('nearby_nudge_friends')
+    if (nearby.error) { setNearbyIds(null); setNotice(nearby.error.code === 'PGRST202'
       ? 'Nudge Friends is being updated. Please try again shortly.' : 'Could not load nearby friends. Please try again.') }
-    else { setNudges((requests.data ?? []) as Nudge[]); setNearbyIds(new Set((nearby.data ?? []) as string[])) }
-    setLoading(false)
+    else setNearbyIds(new Set((nearby.data ?? []) as string[]))
   }, [state.live])
 
   useEffect(() => {
@@ -45,15 +41,6 @@ export function NudgeFriendsScreen() {
       if (count) void fetch('/api/notifications', { method: 'POST' }).catch(() => undefined)
     } catch { setNotice('Connection lost. Please try again.') }
     finally { setBusy(false) }
-  }
-
-  const dismiss = async (id: string) => {
-    if (!state.live || busy) return
-    setBusy(true)
-    const { error } = await createClient().rpc('dismiss_friend_nudge', { p_nudge: id })
-    if (error) setNotice('Could not dismiss this nudge. Please try again.')
-    else setNudges(current => current.filter(nudge => nudge.id !== id))
-    setBusy(false)
   }
 
   const nearbyFriends = state.friends.filter(friend => nearbyIds?.has(friend.person.id))
@@ -79,10 +66,10 @@ export function NudgeFriendsScreen() {
 
     <section className="mx-4 rounded-3xl bg-card p-4" aria-labelledby="received-nudges">
       <h2 id="received-nudges" className="flex items-center gap-2 font-display text-lg font-extrabold"><BellRing className="size-5 text-primary" aria-hidden="true" /> Requests to connect</h2>
-      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading requests…</p> : nudges.length ? <ul className="mt-3 space-y-2">{nudges.map(nudge => <li key={nudge.id} className="flex items-center gap-3 rounded-2xl bg-muted p-3">
+      {nudgeError ? <p role="status" className="mt-3 text-sm text-muted-foreground">Could not load friend nudges. Please try again.</p> : nudgeLoading ? <p className="mt-3 text-sm text-muted-foreground">Loading requests…</p> : nudges.length ? <ul className="mt-3 space-y-2">{nudges.map(nudge => <li key={nudge.id} className="flex items-center gap-3 rounded-2xl bg-muted p-3">
         <PersonAvatar photo={`/api/friend-photo?id=${encodeURIComponent(nudge.sender_id)}`} initials={nudge.sender_name.slice(0,2).toUpperCase()} size={44} />
         <div className="min-w-0 flex-1"><p className="font-semibold">{nudge.sender_name} wants to connect</p><p className="text-xs text-muted-foreground">{new Date(nudge.created_at).toLocaleString('en-GB')}</p></div>
-        <button type="button" disabled={busy} onClick={() => void dismiss(nudge.id)} className="press min-h-10 rounded-xl px-3 text-xs font-bold text-primary disabled:opacity-50">Dismiss</button>
+        <div className="flex flex-col items-end gap-1"><button type="button" onClick={() => actions.openFriendChat(nudge.sender_id)} className="press min-h-10 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">Chat</button><button type="button" disabled={busy} onClick={() => void dismiss(nudge.id).then(ok => { if (!ok) setNotice('Could not dismiss this nudge. Please try again.') })} className="press text-xs font-bold text-muted-foreground disabled:opacity-50">Dismiss</button></div>
       </li>)}</ul> : <p className="mt-3 text-sm text-muted-foreground">No friend nudges right now.</p>}
     </section>
 

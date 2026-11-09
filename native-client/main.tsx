@@ -152,10 +152,11 @@ function NativeClient() {
           await resume.remove()
         }
         // A stalled notification SDK must not hold up account restoration.
-        void listenForNativePushTaps((route, chat, post) => {
-          if (route === 'wall' || route === 'nudges') openAppLink(`uk.co.upcatch.app://app/${route}`)
+        void listenForNativePushTaps((route, chat, post, peer) => {
+          if (route === 'wall' || route === 'nudges' || route === 'notifications') openAppLink(`uk.co.upcatch.app://app/${route}`)
           if (route === 'messages') {
-            const query = chat === 'scheduled' && post ? `?chat=scheduled&post=${encodeURIComponent(post)}` : '?chat=live'
+            const query = chat === 'scheduled' && post ? `?chat=scheduled&post=${encodeURIComponent(post)}`
+              : chat === 'friend' && peer ? `?chat=friend&peer=${encodeURIComponent(peer)}` : '?chat=live'
             openAppLink(`uk.co.upcatch.app://app/messages${query}`)
           }
           void refresh(current)

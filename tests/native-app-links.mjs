@@ -14,6 +14,7 @@ const { parseUpCatchAppLink } = exports
 test('native nudge links resolve to the app screen without accepting foreign origins', () => {
   assert.equal(parseUpCatchAppLink('uk.co.upcatch.app://app/nudges'), '/app?view=nudges')
   assert.equal(parseUpCatchAppLink('https://www.upcatch.uk/app?view=nudges'), '/app?view=nudges')
+  assert.equal(parseUpCatchAppLink('uk.co.upcatch.app://app/notifications'), '/app?view=notifications')
   assert.equal(parseUpCatchAppLink('https://evil.example/app?view=nudges'), null)
   assert.equal(parseUpCatchAppLink('uk.co.upcatch.app://app/unknown'), null)
 })

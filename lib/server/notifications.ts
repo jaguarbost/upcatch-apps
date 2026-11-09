@@ -60,6 +60,14 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     if(nudgeError) throw new Error('Friend nudge unavailable')
     if(!active) return 'skipped'
   }
+  if(job.payload?.route==='messages') {
+    if(!job.payload.message_id || !['live','scheduled','friend'].includes(job.payload.chat ?? '')) return 'skipped'
+    const {data:active,error:chatError}=await admin.rpc('chat_message_push_active',{
+      p_chat:job.payload.chat,p_message:job.payload.message_id,p_recipient:job.user_id,
+    })
+    if(chatError) throw new Error('Message unavailable')
+    if(!active) return 'skipped'
+  }
   const {data:prefs,error:prefsError}=await admin.from('notification_preferences').select('push_enabled').eq('user_id',job.user_id).single()
   if(prefsError) throw new Error('Push preferences unavailable')
   if(!prefs?.push_enabled) return 'skipped'
@@ -73,9 +81,9 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     body:JSON.stringify({app_id:process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID,
       include_aliases:{external_id:[pushAlias(job.user_id)]},target_channel:'push',idempotency_key:job.id,
       headings:{en:job.payload?.title??'Welcome to UpCatch'},contents:{en:job.payload?.text??'Your profile is ready. Say hello to someone new.'},
-      url:siteUrl()+(job.payload?.route==='wall'?'/app?view=wall':job.payload?.route==='nudges'?'/app?view=nudges':job.kind==='meetup_push'?'/app?view=messages&chat=live':'/app'),
-      ...(job.payload?.route==='nudges'?{app_url:'uk.co.upcatch.app://app/nudges'}:{}),
-      data:{route:job.payload?.route==='wall'?'wall':job.payload?.route==='nudges'?'nudges':'app'},ttl}),
+      web_url:siteUrl()+'/app?view=notifications',
+      app_url:'uk.co.upcatch.app://app/notifications',
+      data:{route:'notifications'},small_icon:'ic_stat_upcatch',android_accent_color:'2B59FF',ttl}),
   })
   if(!result.ok) throw new Error('Push provider returned '+result.status)
   const body=await result.json()

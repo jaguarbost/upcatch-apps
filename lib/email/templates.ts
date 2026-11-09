@@ -7,6 +7,8 @@ export type EmailPayload = {
   meetup_id?: string
   post_id?: string
   nudge_id?: string
+  message_id?: number
+  chat?: string
   route?: string
   partner_name?: string
   venue?: string

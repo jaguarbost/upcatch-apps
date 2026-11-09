@@ -165,13 +165,13 @@ export async function restorePush() {
 
 // Register after restoring the native session. The client refreshes live state
 // after a tap; notification payloads never grant access to a meetup.
-export async function listenForNativePushTaps(onOpen: (route: 'app' | 'wall' | 'nudges' | 'messages', chat?: string, post?: string) => void) {
+export async function listenForNativePushTaps(onOpen: (route: 'app' | 'wall' | 'nudges' | 'messages' | 'notifications', chat?: string, post?: string, peer?: string) => void) {
   if (!Capacitor.isNativePlatform() || !process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) return () => undefined
   const client = await loadNativePush()
   const handler = (event: { notification: { additionalData?: object } }) => {
-    const data = event.notification.additionalData as { route?: unknown; chat?: unknown; post_id?: unknown } | undefined
-    if (data?.route === 'app' || data?.route === 'wall' || data?.route === 'nudges' || data?.route === 'messages')
-      onOpen(data.route, typeof data.chat === 'string' ? data.chat : undefined, typeof data.post_id === 'string' ? data.post_id : undefined)
+    const data = event.notification.additionalData as { route?: unknown; chat?: unknown; post_id?: unknown; peer_id?: unknown } | undefined
+    if (data?.route === 'app' || data?.route === 'wall' || data?.route === 'nudges' || data?.route === 'messages' || data?.route === 'notifications')
+      onOpen(data.route, typeof data.chat === 'string' ? data.chat : undefined, typeof data.post_id === 'string' ? data.post_id : undefined, typeof data.peer_id === 'string' ? data.peer_id : undefined)
   }
   client.Notifications.addEventListener('click', handler)
   return () => client.Notifications.removeEventListener('click', handler)
