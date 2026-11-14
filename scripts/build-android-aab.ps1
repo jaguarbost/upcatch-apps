@@ -1,12 +1,15 @@
 param(
   [string]$KeyDirectory = (Join-Path $env:USERPROFILE 'UpCatch-release-keys'),
-  [switch]$Offline
+  [switch]$Offline,
+  [switch]$IncludeApk,
+  [switch]$RequireExistingKey
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $androidRoot = Join-Path $projectRoot 'android'
 $bundlePath = Join-Path $androidRoot 'app\build\outputs\bundle\release\app-release.aab'
+$apkPath = Join-Path $androidRoot 'app\build\outputs\apk\release\app-release.apk'
 $keystorePath = Join-Path $KeyDirectory 'upcatch-upload-key.p12'
 $passwordPath = Join-Path $KeyDirectory 'upcatch-upload-key.password.txt'
 $alias = 'upcatch-upload'
@@ -28,6 +31,7 @@ if ($hasKeystore -ne $hasPassword) {
 }
 
 if (!$hasKeystore) {
+  if ($RequireExistingKey) { throw 'Existing upload key required; no replacement key will be generated.' }
   New-Item -ItemType Directory -Path $KeyDirectory -Force | Out-Null
   # Keep both files outside the project, readable only by the current Windows user.
   $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
@@ -71,7 +75,9 @@ try {
 
   Push-Location $androidRoot
   try {
-    $gradleArgs = @('bundleRelease', '--quiet')
+    $gradleArgs = @('bundleRelease')
+    if ($IncludeApk) { $gradleArgs += 'assembleRelease' }
+    $gradleArgs += '--quiet'
     if ($Offline) { $gradleArgs += '--offline' }
     & .\gradlew.bat @gradleArgs
     if ($LASTEXITCODE -ne 0) { throw 'Android release bundle build failed.' }
@@ -87,6 +93,18 @@ try {
   Write-Output "AAB: $($bundle.FullName)"
   Write-Output "Bytes: $($bundle.Length)"
   Write-Output "SHA-256: $($hash.Hash)"
+  if ($IncludeApk) {
+    if (!(Test-Path -LiteralPath $apkPath)) { throw 'Gradle did not create the expected release APK.' }
+    $apkSigner = Join-Path $androidSdk 'build-tools\36.0.0\apksigner.bat'
+    $apkVerification = & $apkSigner verify --verbose $apkPath 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
+    $apk = Get-Item -LiteralPath $apkPath
+    $apkHash = Get-FileHash -Algorithm SHA256 -LiteralPath $apkPath
+    Write-Output 'APK signature verified by apksigner.'
+    Write-Output "APK: $($apk.FullName)"
+    Write-Output "Bytes: $($apk.Length)"
+    Write-Output "SHA-256: $($apkHash.Hash)"
+  }
   Write-Output "Back up the upload key and password file together from $KeyDirectory"
 } finally {
   Remove-Item Env:UPCATCH_UPLOAD_KEY_PASSWORD -ErrorAction SilentlyContinue

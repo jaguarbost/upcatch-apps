@@ -8,6 +8,7 @@ import {
   Globe2,
   Heart,
   MapPinOff,
+  Moon,
   QrCode,
   RotateCcw,
   ScanLine,
@@ -25,12 +26,15 @@ import { InstallAppCard, NotificationHelp } from '@/components/account/install-a
 import { LearnMoreButton } from './how-it-works'
 import { useState } from 'react'
 import { useUpCatch, type FriendStatus } from './app-provider'
+import { useAppearance } from './appearance-provider'
+import type { AppearanceMode } from '@/lib/appearance-preference'
 import { INTERESTS } from '@/lib/upcatch-data'
 import { Chip, PersonAvatar, Switch } from './primitives'
 import { type Badge, BADGES, BadgeMedal, ShareSheet } from './share-sheet'
 
 export function ProfileScreen() {
   const { state, actions } = useUpCatch()
+  const { mode, setMode } = useAppearance()
   const [demoSettings, setSettings] = useState({
     fuzz: true,
     verifiedOnly: true,
@@ -118,6 +122,13 @@ export function ProfileScreen() {
         </ul>
       </section>
 
+      <section className="mx-4 mt-3 rounded-3xl bg-card p-2" aria-label="Appearance">
+        <Row icon={<Moon className="size-5" />} title="Night mode" sub={mode === 'auto' ? "Follow your phone's appearance" : 'Saved on this device'}>
+          <select aria-label="Night mode" value={mode} onChange={event => setMode(event.target.value as AppearanceMode)} className="min-h-11 rounded-xl border border-border bg-muted px-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="auto">Auto</option><option value="off">Light</option><option value="on">Dark</option>
+          </select>
+        </Row>
+      </section>
       {state.live && <section className="mx-4 mt-3 rounded-3xl bg-card p-2" aria-label="Notifications">
         <Row icon={<Bell className="size-5"/>} title="Push notifications" sub={state.pushBusy?'Connecting this device...':'Offers, meetup updates and friend alerts on this device'}>
           <Switch checked={state.pushEnabled} disabled={state.pushBusy} onChange={actions.setPushEnabled} label="Push notifications"/>

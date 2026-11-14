@@ -3,13 +3,14 @@
 import { ArrowLeft, MessageCircle, Send } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useUpCatch } from './app-provider'
+import { useUpCatch, type Message } from './app-provider'
 import { PersonAvatar } from './primitives'
+import { MessageTimestamp } from './message-timestamp'
 
 export function MessagesScreen() {
   const { state, actions } = useUpCatch()
   const [draft, setDraft] = useState('')
-  const [friendMessages, setFriendMessages] = useState<Array<{id:number;from:'me'|'them';text:string}>>([])
+  const [friendMessages, setFriendMessages] = useState<Message[]>([])
   const [friendError, setFriendError] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
   const selectedPlan = state.scheduledPlans.find(plan => plan.post_id === state.selectedScheduledPostId) ?? state.scheduledPlan
@@ -23,7 +24,7 @@ export function MessagesScreen() {
     if(!state.friendChatId)return
     const {data,error}=await createClient().rpc('list_friend_messages',{p_friend:state.friendChatId})
     if(error){setFriendError(error.code==='P0001'?error.message:'Could not load this chat. Please try again.');return}
-    setFriendMessages(((data??[]) as Array<{id:number;body:string;sender_is_me:boolean}>).map(message=>({id:message.id,from:message.sender_is_me?'me':'them',text:message.body})))
+    setFriendMessages(((data??[]) as Array<{id:number;body:string;sender_is_me:boolean;created_at?:string}>).map(message=>({id:message.id,from:message.sender_is_me?'me':'them',text:message.body,created_at:message.created_at})))
     setFriendError('')
   },[state.friendChatId])
   useEffect(()=>{
@@ -60,7 +61,10 @@ export function MessagesScreen() {
       <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4" aria-label={`Messages with ${partner}`} aria-live="polite">
         {friendError && <p role="status" className="rounded-2xl bg-primary/10 p-3 text-sm text-primary">{friendError}</p>}
         {messages.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">{target==='friend'?'Say hello to your friend.':'Say hello and agree on a public meeting place.'}</p>}
-        {messages.map(message => <p key={message.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${message.from === 'me' ? 'self-end bg-primary text-primary-foreground' : 'self-start bg-card'}`}>{message.text}</p>)}
+        {messages.map(message => <div key={message.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${message.from === 'me' ? 'self-end bg-primary text-primary-foreground' : 'self-start bg-card'}`}>
+          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+          <MessageTimestamp createdAt={message.created_at} mine={message.from === 'me'} />
+        </div>)}
       </div>
       <form onSubmit={event => { event.preventDefault(); send() }} className="flex gap-2 border-t border-border bg-card px-4 py-3">
         <input value={draft} onChange={event => setDraft(event.target.value)} maxLength={80} aria-label={`Message ${partner}`} placeholder="Write a message…" className="h-12 min-w-0 flex-1 rounded-2xl bg-muted px-4 outline-none focus:ring-2 focus:ring-primary" />

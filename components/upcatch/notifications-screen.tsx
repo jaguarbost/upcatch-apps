@@ -73,13 +73,13 @@ export function NotificationsScreen() {
           <button type="button" onClick={() => { void open(item) }} className="press flex w-full items-center gap-3 rounded-3xl p-4 text-left">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Bell className="size-5" aria-hidden="true" /></span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 font-display font-extrabold">{item.title}{!item.read_at && <span className="size-2 shrink-0 rounded-full bg-live" aria-label="Unread" />}</span>
-              <span className="mt-1 block text-sm text-muted-foreground">{item.body}</span>
+              <span className="flex items-center gap-2 font-display font-extrabold">{item.destination === 'nudges' ? 'A friend wants to connect' : item.title}{!item.read_at && <span className="size-2 shrink-0 rounded-full bg-live" aria-label="Unread" />}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{item.destination === 'nudges' ? 'A friend is requesting to connect on UpCatch.' : item.body}</span>
               <span className="mt-2 block text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString('en-GB')}</span>
             </span>
             <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </button>
-          {item.destination==='nudges' && item.peer_id && <button type="button" onClick={() => { void open(item,true) }} className="press mx-4 mb-3 min-h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">Chat with friend</button>}
+          {item.destination==='nudges' && item.peer_id && <button type="button" onClick={() => { void open(item,true) }} className="press mx-4 mb-3 min-h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">Reveal &amp; Chat with friend</button>}
         </li>)}</ul> : <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <span className="grid size-20 place-items-center rounded-full bg-muted"><Inbox className="size-8 text-muted-foreground" aria-hidden="true" /></span>
           <h2 className="font-display text-xl font-extrabold">Nothing new yet</h2>

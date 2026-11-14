@@ -1,0 +1,32 @@
+.night {
+  color-scheme: dark;
+  color: var(--foreground);
+  --background: #0e1726;
+  --foreground: #eef2f8;
+  --card: #182337;
+  --card-foreground: #eef2f8;
+  --popover: #182337;
+  --popover-foreground: #eef2f8;
+  --secondary: #202e44;
+  --secondary-foreground: #eef2f8;
+  --muted: #202e44;
+  --muted-foreground: #b4bfd0;
+  --accent: #293b54;
+  --accent-foreground: #eef2f8;
+  --border: #35445c;
+  --input: #35445c;
+}
+
+/* Dim only the basemap; keep member photos and blue/yellow markers intact. */
+.night :global(.leaflet-tile-pane) {
+  filter: invert(1) hue-rotate(180deg) brightness(.8) saturate(.65);
+}
+
+.night :global(.leaflet-container) {
+  background: var(--background);
+}
+
+.night :global(.leaflet-control-attribution) {
+  background: var(--card);
+  color: var(--muted-foreground);
+}

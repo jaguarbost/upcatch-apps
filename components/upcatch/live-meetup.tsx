@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useUpCatch, useVenueLookup } from './app-provider'
 import { BottomSheet, Chip, PersonAvatar, PrimaryButton } from './primitives'
 import { SafetySheet, type SheetKind } from './safety-sheet'
+import { MessageTimestamp } from './message-timestamp'
 
 const QUICK_REPLIES = ['On my way', '2 mins away', 'I’m inside', 'Running late']
 
@@ -168,7 +169,8 @@ export function LiveMeetup() {
                       msg.from === 'me' ? 'self-end bg-primary text-primary-foreground' : 'self-start bg-card',
                     )}
                   >
-                    {msg.text}
+                    <span className="whitespace-pre-wrap break-words">{msg.text}</span>
+                    <MessageTimestamp createdAt={msg.created_at} mine={msg.from === 'me'} />
                   </p>
                 ))}
               </div>

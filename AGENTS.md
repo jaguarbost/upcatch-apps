@@ -39,6 +39,9 @@ The existing mockups are the visual source of truth. Keep the theme, UI, fonts, 
 ## Git workflow
 
 - Push only to `main` in this project. Do not push feature or release branches unless the user explicitly changes this instruction.
+- This workspace is the Capacitor project. Never update the separate web project or deploy its Vercel project from here. Provide a handoff prompt for web/backend changes to be implemented and deployed from the web project's own workspace.
+- Do not deploy from this workspace without an explicit user request for that deployment. A request to implement, fix, commit or push does not authorize deployment.
+- Ask before changing the production database. Already-applied web migrations may be mirrored locally for consistent native tests; do not apply them from here without explicit approval.
 
 ## Release version
 

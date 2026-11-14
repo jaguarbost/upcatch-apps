@@ -76,6 +76,7 @@ export interface Message {
   id: number
   from: 'me' | 'them'
   text: string
+  created_at?: string
 }
 
 const DEFAULT_DRAFT: Draft = {
@@ -537,7 +538,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
     const nextMessageMap:Record<string,Message[]>={}
     for(const item of scheduledResults){
       if(item.result.error){showToast('Scheduled messages could not be loaded. Please try again.');continue}
-      nextMessageMap[item.postId]=(item.result.data??[]).map((row:{id:number;body:string;sender_is_me:boolean})=>({id:row.id,from:row.sender_is_me?'me':'them',text:row.body}))
+      nextMessageMap[item.postId]=(item.result.data??[]).map((row:{id:number;body:string;sender_is_me:boolean;created_at?:string})=>({id:row.id,from:row.sender_is_me?'me':'them',text:row.body,created_at:row.created_at}))
     }
     setScheduledMessageMap(nextMessageMap)
     setScheduledMessages(nextPlan ? nextMessageMap[nextPlan.post_id]??[] : [])

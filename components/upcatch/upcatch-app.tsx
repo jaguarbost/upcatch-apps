@@ -1,6 +1,7 @@
 'use client'
 
 import styles from './desktop.module.css'
+import { AppearanceProvider } from './appearance-provider'
 import { BrandBadge } from './brand-badge'
 import { AlertsButton, MessagesButton } from './alerts-button'
 import { LocationPermission } from './location-permission'
@@ -38,14 +39,14 @@ const MapCanvas = dynamic(() => import('./map-canvas'), {
 export function UpCatchApp({ initial }: { initial?: LiveBootstrap }) {
   return (
     <UpCatchProvider initial={initial}>
-      <InstallAppProvider><HowItWorksProvider>
+      <AppearanceProvider><InstallAppProvider><HowItWorksProvider>
       <div className="flex min-h-dvh justify-center bg-secondary p-0 lg:p-4 has-[.uc-landing]:bg-background has-[.uc-landing]:p-0">
         <div className={`${styles.app} relative h-dvh w-full overflow-hidden bg-background shadow-none lg:h-[calc(100dvh-2rem)] lg:max-w-[1440px] lg:rounded-[2rem] lg:shadow-2xl has-[.uc-landing]:h-dvh has-[.uc-landing]:max-w-none has-[.uc-landing]:rounded-none has-[.uc-landing]:shadow-none`}>
           <Shell />
           <AppToast />
         </div>
       </div>
-      </HowItWorksProvider></InstallAppProvider>
+      </HowItWorksProvider></InstallAppProvider></AppearanceProvider>
     </UpCatchProvider>
   )
 }

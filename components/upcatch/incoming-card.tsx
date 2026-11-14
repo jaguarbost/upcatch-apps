@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { clockIn, intentById, sharedInterests, venueById, type Offer } from '@/lib/upcatch-data'
 import { useUpCatch, useVenueLookup } from './app-provider'
 import { Chip, CountdownRing, PersonAvatar, PrimaryButton, Verified } from './primitives'
+import { RequestProfile } from './request-profile'
 
 const WINDOW_SECONDS = 20
 
@@ -23,6 +24,8 @@ export function IncomingCard({ offer }: { offer: Offer }) {
   const intent = intentById(offer.intent)
   const shared = sharedInterests(state.user.interests, offer.person.interests)
   const [startLabel] = useState(() => clockIn(offer.startsInMin))
+  const [profileOpen, setProfileOpen] = useState(false)
+  useEffect(() => { setProfileOpen(false) }, [matchId, offer.person.id])
 
   useEffect(() => {
     const started = Date.now()
@@ -80,6 +83,9 @@ export function IncomingCard({ offer }: { offer: Offer }) {
           </div>
         </div>
       </div>
+
+      <button type="button" disabled={left <= 0} onClick={() => setProfileOpen(true)} className="press mt-3 min-h-10 rounded-xl bg-muted px-4 text-sm font-bold text-primary">View profile</button>
+      {profileOpen && left > 0 && <RequestProfile person={offer.person} live={live} seconds={Math.ceil(left / 1000)} fraction={fraction} onClose={() => setProfileOpen(false)} />}
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl bg-foreground p-3 text-background">
         <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-live text-live-foreground">

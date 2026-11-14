@@ -6,6 +6,14 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Native 2.0.2/build 6: web UI adaptation — 2026-11-14
+
+- Adapted the requested night mode, incoming View profile and nudge UI from web main `7a76dc7`, rechecked at `5e5cd5a`. Added Auto mode following the user's subsequent instruction, with device-local Auto/manual settings in Profile. Added the UpCatch home wordmark and Never go alone beneath the splash icon. Preserved native auth/deep links, QR behavior, private-image and permission bridges, fonts, blue/yellow accents, existing QR layout and map behavior. Nudge is already left of Online/Offline. Meetup start timing was explicitly deferred and remains unchanged.
+- Native push registration now waits for a subscription ID and the signed-in account alias in addition to the push token. Real Safari-to-TestFlight delivery is still unverified; recent hosted jobs report `No subscribed device was available`. All five existing web nudge migrations were confirmed recorded through a read-only check and mirrored locally; none was applied from here.
+- Small date/time labels use persisted `created_at` across chat views. The Go Live timestamp migration `202611140006_chat_timestamps.sql` remains pending approval and was not applied; missing backend timestamps are never fabricated. Profile now offers Auto/Light/Dark and rechecks Auto on native resume.
+- **Local:** `pnpm typecheck`, `pnpm build`, `pnpm native:bundle`, `pnpm test:native` (46), `pnpm test:push` (13) and `pnpm test:db` (290) passed. The generated splash was visually inspected. Version is 2.0.2/build 6; signed Android AAB/APK generation follows the code push using the existing key. See [native-night-mode-validation.md](native-night-mode-validation.md) for acceptance steps and [web-push-handoff.md](web-push-handoff.md) for the separate web-workspace prompt.
+- **Release boundary:** No web deployment, production environment change or production database write for this update. No new signed binary, TestFlight upload or physical-device/UI acceptance was verified. Milestone completion remains 25% (3/12).
+
 ## Push availability rules and TestFlight investigation — 2026-11-14
 
 - Friend-online push now queues one alert for each eligible friend only while both have unexpired Go Live availability in the same city, respecting friend preferences, push opt-in and blocks. Dispatch rechecks availability so delayed online alerts are skipped after either friend leaves. Existing new-message and explicit-nudge alerts remain eligible for offline recipients. The hourly per-friend deduplication remains in place. No approved UI or native binary was changed.

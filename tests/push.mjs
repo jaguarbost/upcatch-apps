@@ -116,7 +116,7 @@ test('native push binds the authenticated alias and disconnects on sign-out',asy
   initialize:async id=>calls.push(['initialize',id]),
   Notifications:{requestPermission:async()=>true,hasPermission:async()=>true},
   login:async alias=>calls.push(['login',alias]),logout:async()=>calls.push(['logout']),
-  User:{pushSubscription:{optIn:async()=>calls.push(['optIn']),optOut:async()=>calls.push(['optOut']),getOptedInAsync:async()=>true,getTokenAsync:async()=> 'fcm-token'}},
+  User:{getExternalId:async()=> 'opaque-alias',pushSubscription:{optIn:async()=>calls.push(['optIn']),optOut:async()=>calls.push(['optOut']),getOptedInAsync:async()=>true,getTokenAsync:async()=> 'push-token',getIdAsync:async()=> 'subscription-id'}},
  }
  global.fetch=async(_url,options)=>options?.method==='POST'?{ok:true}:{ok:true,json:async()=>({alias:'opaque-alias',enabled:false})}
  t.after(()=>{global.fetch=originalFetch;if(originalId===undefined)delete process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;else process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID=originalId})
@@ -135,7 +135,7 @@ test('native push taps accept only known internal destinations',async t=>{
  process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID='test-app'
  t.after(()=>{if(previous===undefined)delete process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;else process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID=previous})
  let click,removed
- const opens=[]
+ const opens=[],conversations=[]
  const client={initialize:async()=>{},Notifications:{
   addEventListener:(_event,handler)=>{click=handler},
   removeEventListener:(_event,handler)=>{removed=handler},
@@ -145,13 +145,60 @@ test('native push taps accept only known internal destinations',async t=>{
   '@onesignal/capacitor-plugin':{__esModule:true,default:client},
   './browser-permissions':{deviceKind:()=> 'android',isInstalledApp:()=>true},
  })
- const stop=await api.listenForNativePushTaps(route=>{opens.push(route)})
+ const stop=await api.listenForNativePushTaps((route,chat,post,peer)=>{opens.push(route);if(route==='messages')conversations.push({chat,post,peer})})
  click({notification:{additionalData:{route:'https://evil.example'}}})
  click({notification:{additionalData:{route:'app'}}})
  click({notification:{additionalData:{route:'wall'}}})
  click({notification:{additionalData:{route:'nudges'}}})
  click({notification:{additionalData:{route:'notifications'}}})
- assert.deepEqual(opens,['app','wall','nudges','notifications'])
+ click({notification:{additionalData:{route:'messages',chat:'friend',peer_id:'friend-id'}}})
+ assert.deepEqual(opens,['app','wall','nudges','notifications','messages'])
+ assert.deepEqual(conversations,[{chat:'friend',post:undefined,peer:'friend-id'}])
  stop()
  assert.equal(removed,click)
+})
+
+for(const missing of ['subscription','alias','opt-in'])test(`native push does not save enabled with a token but missing ${missing}`,async t=>{
+ const originalFetch=global.fetch,originalId=process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
+ process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID='test-app'
+ let saved=0,optedOut=0
+ const client={
+  initialize:async()=>{},login:async()=>{},
+  Notifications:{requestPermission:async()=>true},
+  User:{getExternalId:async()=>missing==='alias'?'previous-account':'opaque-alias',pushSubscription:{
+   optIn:async()=>{},optOut:async()=>{optedOut++},getOptedInAsync:async()=>missing!=='opt-in',
+   getTokenAsync:async()=> 'apns-token',getIdAsync:async()=>missing==='subscription'?null:'subscription-id',
+  }},
+ }
+ global.fetch=async(_url,options)=>{if(options?.method==='POST')saved++;return {ok:true,json:async()=>({alias:'opaque-alias'})}}
+ t.mock.method(global,'setTimeout',callback=>{queueMicrotask(callback);return 1})
+ t.after(()=>{global.fetch=originalFetch;if(originalId===undefined)delete process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;else process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID=originalId})
+ const api=await load('lib/push-client.ts',{
+  '@capacitor/core':{Capacitor:{isNativePlatform:()=>true}},
+  '@onesignal/capacitor-plugin':{__esModule:true,default:client},
+  './browser-permissions':{deviceKind:()=> 'ios',isInstalledApp:()=>true},
+ })
+ await assert.rejects(api.setPushEnabled(true),/not finished registering/)
+ assert.equal(saved,0)
+ assert.equal(optedOut,1)
+})
+
+test('native restore waits for a subscription linked to the signed-in account',async t=>{
+ const originalFetch=global.fetch,originalId=process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
+ process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID='test-app'
+ let polls=0
+ const client={initialize:async()=>{},login:async()=>{},Notifications:{hasPermission:async()=>true},
+  User:{getExternalId:async()=> 'opaque-alias',pushSubscription:{optIn:async()=>{},getOptedInAsync:async()=>polls>=2,
+   getTokenAsync:async()=> 'apns-token',getIdAsync:async()=>++polls<2?null:'subscription-id'}},
+ }
+ global.fetch=async()=>({ok:true,json:async()=>({alias:'opaque-alias',enabled:true})})
+ t.mock.method(global,'setTimeout',callback=>{queueMicrotask(callback);return 1})
+ t.after(()=>{global.fetch=originalFetch;if(originalId===undefined)delete process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;else process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID=originalId})
+ const api=await load('lib/push-client.ts',{
+  '@capacitor/core':{Capacitor:{isNativePlatform:()=>true}},
+  '@onesignal/capacitor-plugin':{__esModule:true,default:client},
+  './browser-permissions':{deviceKind:()=> 'ios',isInstalledApp:()=>true},
+ })
+ assert.equal(await api.restorePush(),true)
+ assert.equal(polls,2)
 })

@@ -35,7 +35,13 @@ function navigate(path: string, replace = false) {
 function StartupScreen() {
   return <div className="native-login-background">
     <main className="grid min-h-dvh place-items-center" role="status" aria-live="polite">
-      <LogoMark size={96} />
+      <div className="flex flex-col items-center gap-4">
+        <LogoMark size={96} />
+        <span className="rounded-2xl bg-white px-5 py-2 font-display text-4xl font-extrabold tracking-tight" aria-label="UpCatch">
+          <span className="text-live">Up</span><span className="text-primary">Catch</span><span className="text-[#0e1726]">.</span>
+        </span>
+        <p className="rounded-full bg-[#0e1726]/80 px-4 py-2 font-semibold text-white">Never go alone</p>
+      </div>
       <span className="sr-only">Opening UpCatch</span>
     </main>
   </div>
@@ -148,6 +154,7 @@ function NativeClient() {
         window.addEventListener('upcatch:native-reload', reload)
         window.addEventListener('upcatch:native-signout', reload)
         const resume = await App.addListener('appStateChange', event => {
+          if (event.isActive) window.dispatchEvent(new Event('upcatch:appearance-resume'))
           if (event.isActive && ['/app', '/onboarding'].includes(window.location.pathname)) refresh(current)
         })
         releaseResume = async () => {

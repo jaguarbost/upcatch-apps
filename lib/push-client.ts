@@ -27,9 +27,15 @@ function loadNativePush() {
   return nativePush
 }
 
-async function waitForNativePushToken(client: typeof import('@onesignal/capacitor-plugin')['default']) {
+async function waitForNativePushRegistration(client: typeof import('@onesignal/capacitor-plugin')['default'], alias: string) {
   for (let attempt = 0; attempt < 20; attempt++) {
-    if (await client.User.pushSubscription.getTokenAsync()) return true
+    const [token, subscriptionId, externalId, optedIn] = await Promise.all([
+      client.User.pushSubscription.getTokenAsync(),
+      client.User.pushSubscription.getIdAsync(),
+      client.User.getExternalId(),
+      client.User.pushSubscription.getOptedInAsync(),
+    ])
+    if (optedIn && token && subscriptionId && externalId === alias) return true
     await new Promise(resolve => setTimeout(resolve, 500))
   }
   return false
@@ -105,10 +111,9 @@ export async function setPushEnabled(enabled: boolean) {
     if (!permission) throw new Error('Notifications are blocked. Allow UpCatch in your device settings, or continue without them.')
     await client.login(alias)
     await client.User.pushSubscription.optIn()
-    if (!await client.User.pushSubscription.getOptedInAsync()) throw new Error('This device could not subscribe. Please retry or check your notification settings.')
-    if (!await waitForNativePushToken(client)) {
+    if (!await waitForNativePushRegistration(client, alias)) {
       await client.User.pushSubscription.optOut().catch(() => undefined)
-      throw new Error('This device has not received a push token. Check Google Play services and the Android FCM setup, then retry.')
+      throw new Error('This device has not finished registering for push notifications. Check your notification settings and connection, then retry.')
     }
     try {
       const saved = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) })
@@ -150,7 +155,7 @@ export async function restorePush() {
     await client.login(alias)
     if (!await client.Notifications.hasPermission()) return false
     await client.User.pushSubscription.optIn()
-    return await client.User.pushSubscription.getOptedInAsync() && Boolean(await client.User.pushSubscription.getTokenAsync())
+    return await waitForNativePushRegistration(client, alias)
   }
   if (!process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || !('Notification' in window) || Notification.permission !== 'granted') return false
   const response = await fetch('/api/push')
