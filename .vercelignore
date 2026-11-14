@@ -5,4 +5,9 @@ node_modules/
 android/
 ios/
 capacitor-web/
-.env.local
+.env*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+upcatch-mac.zip

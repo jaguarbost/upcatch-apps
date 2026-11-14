@@ -10,7 +10,7 @@ async function beginDelivery(job: Job) {
   if(error)throw new Error('Could not record provider attempt')
   if(!data)throw new ReplayExpired('Provider replay window expired; manual review required')
 }
-type Job = { id: string; user_id: string; kind: 'welcome_email' | 'paired_email' | 'feedback_email' | 'welcome_push' | 'meetup_push' | 'trusted_email' | 'friend_push'; payload?: EmailPayload; lease_token: string; created_at: string }
+type Job = { id: string; event_key?: string; user_id: string; kind: 'welcome_email' | 'paired_email' | 'feedback_email' | 'welcome_push' | 'meetup_push' | 'trusted_email' | 'friend_push'; payload?: EmailPayload; lease_token: string; created_at: string }
 export function pushAlias(userId: string) {
   const secret = process.env.ONESIGNAL_ALIAS_SECRET
   if (!secret || secret.length < 32) throw new Error('Push alias secret must have at least 32 characters.')
@@ -48,6 +48,11 @@ async function deliver(job: Job): Promise<'sent' | 'skipped'> {
     })
     if(!result.ok) throw new Error('Email provider returned '+result.status)
     return 'sent'
+  }
+  if(job.kind==='friend_push' && job.event_key?.startsWith('friend-online:')) {
+    const {data:active,error:friendError}=await admin.rpc('friend_online_push_active',{p_job:job.id})
+    if(friendError) throw new Error('Friend availability unavailable')
+    if(!active) return 'skipped'
   }
   if(job.payload?.route==='wall' && job.payload.post_id) {
     const {data:active,error:postError}=await admin.rpc('scheduled_post_push_active',{p_post:job.payload.post_id})

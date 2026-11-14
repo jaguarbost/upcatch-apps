@@ -6,6 +6,14 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Push availability rules and TestFlight investigation — 2026-11-14
+
+- Friend-online push now queues one alert for each eligible friend only while both have unexpired Go Live availability in the same city, respecting friend preferences, push opt-in and blocks. Dispatch rechecks availability so delayed online alerts are skipped after either friend leaves. Existing new-message and explicit-nudge alerts remain eligible for offline recipients. The hourly per-friend deduplication remains in place. No approved UI or native binary was changed.
+- **Local:** `pnpm typecheck`, `pnpm test:push` (9 checks), `pnpm test:db` (284 checks), and `pnpm build` passed. Added behavior checks for reciprocal online alerts, expired/offline/blocked/opted-out recipients, offline messages and offline nudges.
+- **Hosted:** Confirmed the message, nudge and friend-online triggers are enabled. Applied and journaled only `202611140001_mutual_online_friend_push.sql`; the new eligibility RPC is restricted to `service_role`. The unrelated pending three-meetup-ID migration was not applied. Refreshed the linked Vercel Production settings and found both server push credentials empty; populated `ONESIGNAL_API_KEY` and the stable existing `ONESIGNAL_ALIAS_SECRET` from ignored local configuration without displaying values. Deployment remains to be verified.
+- **Device/user evidence:** The user reports a manual OneSignal notification reached the TestFlight app and opened when tapped, but Total Clicks did not increase. A read-only check using the local app/alias configuration found no iOS subscription attached to the five push-enabled UpCatch account aliases. The user confirms the Codemagic App ID matches. After deployment, reopen the app and enable its notification toggle to bind the installed subscription, then test actual messages/nudges with two accounts. Automatic device delivery and click reporting remain unverified. Milestones stay at 25% (3/12).
+- `.vercelignore` excludes local environment files, signing files and the local Mac archive from deployment uploads.
+
 ## Codemagic iOS guide — 2026-11-14
 
 - Added [ios-codemagic-app-store-guide.md](ios-codemagic-app-store-guide.md), covering Git clone, personal-plan costs, Apple credentials/signing, a project-specific YAML template, TestFlight installation and public App Store release without local Xcode. Added the root `codemagic.yaml` so Codemagic can discover the workflow once its branch is pushed. Apple integration, signing files and public configuration must be set up in the dashboard before running it.

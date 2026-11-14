@@ -3,6 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { runMatchingChecks } from './matching-checks.mjs'
+import { runNotificationChecks } from './notification-checks.mjs'
 
 const db = new PGlite()
 let checks=0
@@ -438,5 +439,6 @@ try {
   }
 
   await runMatchingChecks(db,{city,asUser,check,reject})
+  await runNotificationChecks(db,{city,asUser,check,reject})
   console.log('\n'+checks+' database checks passed.')
 } catch(error) { console.error('Database check failed:',error.message,'code:',error.code??'', 'position:',error.position??''); process.exitCode=1 } finally {await db.close()}

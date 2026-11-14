@@ -18,7 +18,7 @@ test('offer TTL cannot outlive its 30-second deadline',()=>{
  assert.equal(pushTTL('invalid',now),0)
  assert.equal(pushTTL(undefined,now),3600)
 })
-async function deliveryFixture(t,jobs){
+async function deliveryFixture(t,jobs,active=true){
  const originalFetch=global.fetch
  const keys=['ONESIGNAL_API_KEY','NEXT_PUBLIC_ONESIGNAL_APP_ID','ONESIGNAL_ALIAS_SECRET']
  const saved=Object.fromEntries(keys.map(key=>[key,process.env[key]]))
@@ -30,6 +30,7 @@ async function deliveryFixture(t,jobs){
   auth:{admin:{getUserById:async()=>({data:{user:{email_confirmed_at:'2026-01-01'}},error:null})}},
   from:()=>({select:()=>({eq:()=>({single:async()=>({data:{push_enabled:true},error:null})})})}),
   rpc:async(name,args)=>{
+   if(['friend_online_push_active','friend_nudge_push_active','chat_message_push_active'].includes(name))return {data:active,error:null}
    if(name==='notification_recipients')return {data:[{user_id:'first'},{user_id:'second'},{user_id:'second'}],error:null}
    if(name==='claim_notification_jobs'){claimed.push(args.p_user);return {data:jobs.filter(job=>job.user_id===args.p_user),error:null}}
    if(name==='begin_notification_delivery')return {data:true,error:null}
@@ -48,6 +49,24 @@ test('expired offers are skipped without contacting OneSignal',async t=>{
  const f=await deliveryFixture(t,[{id:'job',user_id:'first',kind:'meetup_push',lease_token:'lease',payload:{expires_at:new Date(Date.now()-1000).toISOString()}}])
  await f.api.deliverNotifications('first')
  assert.equal(f.requests.length,0);assert.equal(f.finished[0].p_state,'skipped')
+})
+
+test('delayed friend-online push is skipped once either friend goes offline',async t=>{
+ const f=await deliveryFixture(t,[{id:'job',event_key:'friend-online:sender:recipient:hour',user_id:'first',kind:'friend_push',lease_token:'lease'}],false)
+ await f.api.deliverNotifications('first')
+ assert.equal(f.requests.length,0)
+ assert.equal(f.finished[0].p_state,'skipped')
+})
+
+test('available friends, offline messages and offline nudges reach the push provider',async t=>{
+ const f=await deliveryFixture(t,[
+  {id:'online',event_key:'friend-online:sender:recipient:hour',user_id:'first',kind:'friend_push',lease_token:'lease'},
+  {id:'message',user_id:'first',kind:'friend_push',lease_token:'lease',payload:{route:'messages',chat:'friend',message_id:1}},
+  {id:'nudge',user_id:'first',kind:'friend_push',lease_token:'lease',payload:{route:'nudges',nudge_id:'nudge'}},
+ ])
+ await f.api.deliverNotifications('first')
+ assert.equal(f.requests.length,3)
+ assert.ok(f.finished.every(job=>job.p_state==='sent'))
 })
 test('dispatch reaches both members and applies remaining offer TTL',async t=>{
  const f=await deliveryFixture(t,[{id:'job',user_id:'second',kind:'meetup_push',lease_token:'lease',payload:{expires_at:new Date(Date.now()+30000).toISOString()}}])
