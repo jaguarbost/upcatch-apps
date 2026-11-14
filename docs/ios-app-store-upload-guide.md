@@ -1,5 +1,14 @@
 # UpCatch — App Store upload checklist
 
+## Already created a demo project or package in Xcode?
+
+1. Save the demo if you want to keep it, then close its Xcode window. Leave its generated files in that separate project.
+2. Follow section 0 below to clone UpCatch into `~/Developer/upcatch-capacitor`, configure `.env.local`, and run the build commands. If you already cloned it, use the existing-clone commands instead.
+3. Open UpCatch with `open ios/App/App.xcodeproj` from the UpCatch folder. Let Swift packages resolve. Do not create another Xcode project or copy the demo files into UpCatch.
+4. Select the blue **App** project in the left sidebar, then **TARGETS → App → Signing & Capabilities**. Enable **Automatically manage signing** and select your Apple Developer team. Keep **Bundle Identifier: `uk.co.upcatch.app`**. The organization identifier, if asked, is `uk.co.upcatch`.
+5. Connect your iPhone, select it as the run destination, and click **Run ▶**. Complete the device checks in section 2.
+6. After testing passes, follow section 3 to archive and upload the existing UpCatch app.
+
 ## 0. Get the project from Git on your Mac
 
 Install Xcode from the App Store and Node **22** from [Node.js downloads](https://nodejs.org/en/download). Open Xcode once and install its requested iOS components. In Terminal, run these commands one at a time:
