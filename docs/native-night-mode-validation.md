@@ -1,4 +1,4 @@
-# Native 2.0.2, build 6: night mode, incoming profiles and nudges
+# Native 2.0.2, build 7: night mode, incoming profiles and nudges
 
 Source reference: `jaguarbost/upcatch-brandnew` main at `7a76dc7` (Remove remaining timed nudge cooldowns), fetched read-only on 14 November 2026; rechecked main at `5e5cd5a`. Only the requested UI and nudge changes were adapted. The user subsequently authorized Auto night mode and a branded splash. Native authentication, deep links, private image loading, QR features and native permission integrations remain in place. The existing QR button locations and map behavior were retained rather than copying unrelated web changes.
 
@@ -12,17 +12,22 @@ Source reference: `jaguarbost/upcatch-brandnew` main at `7a76dc7` (Remove remain
 - Received nudges and notification cards conceal the name/photo until Reveal & Chat with friend opens the existing friend conversation. Old inbox text is also rendered anonymously. Removed the obsolete timed-cooldown wording; existing pending nudges are still deduplicated.
 - Mirrored the five already-applied nudge migrations from the web source into the local migration directory so isolated database tests use the same contracts. No production database changes were made for this update.
 - Native push opt-in/restore now checks the OneSignal subscription ID and the requested external account alias as well as the APNs/FCM token. The app no longer reports successful registration based on a token alone, and its failure guidance applies to iOS as well as Android.
+- The iOS follow-up sets `OneSignal_suppress_launch_urls` to true. OneSignal's SDK no longer automatically launches Safari for a notification URL; the existing click listener owns allowlisted in-app navigation. The existing custom scheme, auth callbacks and click reporting hooks are retained. This is documented in [OneSignal's native deep-link guide](https://documentation.onesignal.com/docs/en/deep-linking). It still requires an installed-device test.
 - The proposed 15-minute meetup start change was deferred at the user's request. Acceptance timing and its displayed start/end times are unchanged.
 
 ## Local verification
 
 Passed `pnpm typecheck`, `pnpm build`, `pnpm native:bundle`, `pnpm test:native` (46 checks), `pnpm test:push` (13 checks) and `pnpm test:db` (290 checks). The native suite exercises Auto/system/resume behavior, persisted timestamp parsing, and notification-link routing with mocks. Windows initially blocked the push runner and esbuild with EPERM; approved reruns passed. The generated splash was visually inspected. Vite emitted its existing client-directive and chunk-size warnings but completed successfully.
 
-Version metadata is aligned at 2.0.2/build 6. Local native sync/release checks precede the code push. Signed Android AAB/APK generation is scheduled after the source push using the existing upload key and `scripts/build-android-aab.ps1 -RequireExistingKey -IncludeApk`. No signed iOS archive, TestFlight upload, physical-device visual test or browser automation was performed. ADB listed no attached Android device, so actual theme changes, preview/countdown, timestamps and notification taps remain device acceptance items.
+Version metadata is aligned at 2.0.2/build 7 for the iOS URL-routing follow-up, avoiding a duplicate if build 6 was uploaded to TestFlight. Local native sync/release checks precede the code push. Signed Android AAB/APK generation follows the source push using the existing upload key and `scripts/build-android-aab.ps1 -RequireExistingKey -IncludeApk`. No signed iOS archive, TestFlight upload, physical-device visual test or browser automation was performed. ADB listed no attached Android device, so actual theme changes, preview/countdown, timestamps and notification taps remain device acceptance items.
 
 ## Read-only hosted findings
 
 The migration journal confirms all five web nudge migrations are already applied. Recent message and nudge push jobs still report No subscribed device was available. This update does not establish that automatic push delivery or OneSignal click reporting is fixed. Manual OneSignal delivery was reported by the user; Safari-to-app nudge delivery was reported unsuccessful. See [web-push-handoff.md](web-push-handoff.md).
+
+Later read-only checks found successful offer delivery, cancellation pushes for zero-acceptance draft offers, and HTTP 400 failures on new message/nudge sends. The web agent reports preparing a split `web_url`/`app_url` payload without the shared `url`; this is the correct documented approach but its deployment/device result was not verified here. Draft-cancellation suppression and missing scheduled-acceptance push/inbox triggers remain backend handoff items requiring the authorized web workflow and migration approval.
+
+The dependency audit, run after source push `c136253`, reports 4 critical and 40 high findings across all dependencies; see [the complete audit](dependency-vulnerability-audit-20261114.md) for exact advisories, versions, paths and native/server exposure limits. No dependency fixes were applied as part of this release.
 
 No website deployment, web-repository push, production environment update, notification send or production database mutation was made during this update. Native milestone completion stays at 25% (3/12) until device acceptance passes.
 
