@@ -14,11 +14,10 @@ mkdir -p ~/Developer
 cd ~/Developer
 ```
 
-**Repository URL:** Awaiting confirmation of the Capacitor repository. The Windows checkout currently points to `https://github.com/jaguarbost/upcatch-apps.git`; the requested destination is Capacitor `main`. Do not clone the web repository by mistake. Once the destination is confirmed and the push succeeds, set its HTTPS URL below:
+Clone the confirmed Capacitor repository's `main` branch:
 
 ```sh
-UPCATCH_REPO_URL='PASTE_CONFIRMED_CAPACITOR_GITHUB_URL_HERE'
-git clone --branch main "$UPCATCH_REPO_URL" upcatch-capacitor
+git clone --branch main https://github.com/jaguarbost/upcatch-apps.git upcatch-capacitor
 cd upcatch-capacitor
 git log -1 --oneline
 nano .env.local
