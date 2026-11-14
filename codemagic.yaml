@@ -1,0 +1,54 @@
+workflows:
+  upcatch-ios:
+    name: UpCatch iOS upload
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: upcatch-apple
+    environment:
+      node: 22
+      xcode: 26.3
+      groups:
+        - upcatch_native_public
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: uk.co.upcatch.app
+    scripts:
+      - name: Install locked dependencies
+        script: |
+          set -eu
+          npx --yes pnpm@10.30.3 install --frozen-lockfile
+      - name: Check source and package native client
+        script: |
+          set -eu
+          unset CAPACITOR_SERVER_URL
+          npx --yes pnpm@10.30.3 typecheck
+          npx --yes pnpm@10.30.3 test:native
+          npx --yes pnpm@10.30.3 native:bundle
+          npx --yes pnpm@10.30.3 native:sync
+          npx --yes pnpm@10.30.3 native:check
+          npx --yes pnpm@10.30.3 native:release-check
+      - name: Resolve Swift packages
+        script: |
+          set -eu
+          xcodebuild -resolvePackageDependencies \
+            -project ios/App/App.xcodeproj -scheme App
+      - name: Apply distribution profile
+        script: |
+          set -eu
+          xcode-project use-profiles
+      - name: Archive and export signed IPA
+        script: |
+          set -eu
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --config Release
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false

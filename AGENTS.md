@@ -36,6 +36,10 @@ The existing mockups are the visual source of truth. Keep the theme, UI, fonts, 
 - Do not expose the private schema or server-only credentials to browser code.
 - See `docs/setup.md`, `docs/database-architecture.md`, and `docs/manchester-venues.md`.
 
+## Git workflow
+
+- Push only to `main` in this project. Do not push feature or release branches unless the user explicitly changes this instruction.
+
 ## Release version
 
 - Show the app version at the end of the profile, sourced from `package.json`.

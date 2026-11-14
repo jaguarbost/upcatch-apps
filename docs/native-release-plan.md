@@ -6,6 +6,11 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Codemagic iOS guide — 2026-11-14
+
+- Added [ios-codemagic-app-store-guide.md](ios-codemagic-app-store-guide.md), covering Git clone, personal-plan costs, Apple credentials/signing, a project-specific YAML template, TestFlight installation and public App Store release without local Xcode. Added the root `codemagic.yaml` so Codemagic can discover the workflow once its branch is pushed. Apple integration, signing files and public configuration must be set up in the dashboard before running it.
+- **Documentation only:** Checked project identifiers, scripts, Swift Package Manager setup and current provider documentation. No Codemagic build, signing, Apple upload or device installation was verified. Milestone completion remains 25% (3/12).
+
 ## Android build 5 — 2026-11-09
 
 - Android version code is 5 and app version is 2.0.1, aligned with `package.json` and the iOS project metadata. Capacitor Android, core, CLI and iOS are aligned at 8.6.0. Release R8 code optimization and resource shrinking are enabled with the optimized default ProGuard rules. The OneSignal small icon is explicitly retained for runtime lookup.
