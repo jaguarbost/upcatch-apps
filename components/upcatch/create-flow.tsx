@@ -1,6 +1,6 @@
 'use client'
 
-import { BadgeCheck, Car, ChevronLeft, Footprints, X } from 'lucide-react'
+import { BadgeCheck, Car, ChevronLeft, Footprints, LoaderCircle, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { haptic } from '@/lib/haptics'
 import { INTENTS, VENUES, intentById } from '@/lib/upcatch-data'
@@ -100,12 +100,12 @@ export function CreateFlow() {
               <h2 className="font-display text-3xl leading-tight font-extrabold">A few details</h2>
             </div>
 
-            <Field label="Say something (optional)">
+            <Field label={state.createMode === 'scheduled' ? 'Your invite' : 'Say something (optional)'}>
               <input
                 value={d.note}
                 onChange={(e) => actions.updateDraft({ note: e.target.value })}
                 maxLength={60}
-                placeholder="e.g. 30 mins before my next call"
+                placeholder={state.createMode === 'scheduled' ? 'e.g. Coffee after work?' : 'e.g. 30 mins before my next call'}
                 className="h-14 rounded-2xl bg-card px-4 text-base outline-none focus:ring-2 focus:ring-primary"
               />
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -126,7 +126,32 @@ export function CreateFlow() {
             </Field>
 
             <Field label="When are you free?">
-              <Segmented options={WINDOWS} value={d.windowMin} onChange={(v) => actions.updateDraft({ windowMin: v })} />
+              <div className="flex gap-1 rounded-2xl bg-muted p-1" role="radiogroup" aria-label="Invite timing">
+                {(['scheduled', 'instant'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    disabled={state.createModeLocked && mode === 'instant'}
+                    aria-checked={state.createMode === mode}
+                    onClick={() => { haptic('select'); actions.chooseCreateMode(mode) }}
+                    className={cn('press min-h-12 flex-1 rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45', state.createMode === mode ? 'bg-card shadow-sm' : 'text-muted-foreground')}
+                  >
+                    {mode === 'scheduled' ? 'Schedule' : 'Now'}
+                  </button>
+                ))}
+              </div>
+              {state.createMode === 'scheduled' ? <>
+                <label htmlFor="upcatch-scheduled-at" className="text-sm font-bold text-muted-foreground">Date and time</label>
+                <input
+                  id="upcatch-scheduled-at"
+                  type="datetime-local"
+                  value={d.scheduledAt}
+                  onChange={(e) => actions.updateDraft({ scheduledAt: e.target.value })}
+                  className="h-14 w-full min-w-0 rounded-2xl bg-card px-4 text-base text-foreground outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground">Choose a time from 15 minutes to 14 days ahead. Meet at a public venue.</p>
+              </> : <Segmented options={WINDOWS} value={d.windowMin} onChange={(v) => actions.updateDraft({ windowMin: v })} />}
             </Field>
 
             <Field label="How far will you go?">
@@ -156,8 +181,8 @@ export function CreateFlow() {
             </Field>
           </div>
           <footer className="border-t border-border bg-card px-5 pt-3 pb-safe">
-            <PrimaryButton onClick={() => state.live ? actions.publish() : actions.setCreateStep(3)} className="mb-3 w-full">
-              {state.live ? 'Go online' : 'Pick a venue'}
+            <PrimaryButton disabled={state.scheduledBusy} onClick={() => state.createMode === 'scheduled' ? actions.publishScheduled() : state.live ? actions.publish() : actions.setCreateStep(3)} className="mb-3 w-full">
+              {state.scheduledBusy ? <><LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> Creating invite...</> : state.createMode === 'scheduled' ? 'Create scheduled invite' : state.live ? 'Go online' : 'Pick a venue'}
             </PrimaryButton>
           </footer>
         </>

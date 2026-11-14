@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const params = url.searchParams
   const isReset = params.get('next') === 'reset'
-  if (params.has('error')) return redirectTo('/auth/login?oauth_error=1', url.origin)
+  if (params.has('error')) return redirectTo(isReset ? '/auth/forgot-password?expired=1' : '/auth/login?oauth_error=1', url.origin)
 
   // Google OAuth and default Supabase emails use PKCE and return ?code=.
   const code = params.get('code')

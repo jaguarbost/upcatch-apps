@@ -117,7 +117,11 @@ function NativeClient() {
         releaseLinks = await current.authFlow.listen(async result => {
           if (!mounted) return
           await Browser.close().catch(() => undefined)
-          if (result.kind === 'error') { setNotice('Sign-in was not completed. Please try again.'); navigate('/auth/login'); return }
+          if (result.kind === 'error') {
+            setNotice(result.recovery ? 'That reset link has expired or was already used. Request a new link.' : 'Sign-in was not completed. Please try again.')
+            navigate(result.recovery ? '/auth/forgot-password?expired=1' : '/auth/login')
+            return
+          }
           if (result.kind === 'confirmation') { setPendingConfirmation(result); navigate('/auth/confirm'); return }
           const completed = await current.authFlow.finishCode(result)
           if (completed.kind === 'needs-terms') navigate('/auth/accept-terms')
@@ -192,7 +196,7 @@ function NativeClient() {
   </AccountShell>
   if (path === '/auth/signup') return <SignUpScreen runtime={runtime} navigate={navigate} />
   if (path === '/auth/check-email') return <CheckEmailScreen runtime={runtime} navigate={navigate} reset={new URLSearchParams(window.location.search).has('reset')} />
-  if (path === '/auth/forgot-password') return <ForgotScreen runtime={runtime} navigate={navigate} />
+  if (path === '/auth/forgot-password') return <ForgotScreen runtime={runtime} navigate={navigate} expired={new URLSearchParams(window.location.search).has('expired')} />
   if (path === '/auth/confirm') return <ConfirmScreen runtime={runtime} pending={pendingConfirmation} ready={ready} navigate={navigate} />
   if (path === '/auth/reset-password') return <ResetScreen ready={ready} />
   if (path === '/auth/accept-terms') return <AcceptTermsScreen runtime={runtime} ready={ready} />

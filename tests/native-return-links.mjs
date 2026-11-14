@@ -31,7 +31,8 @@ test('only the registered auth callback accepts credentials', () => {
 test('recovery and confirmation links route to the correct flow', () => {
   assert.deepEqual(parseNativeAuthReturn('uk.co.upcatch.app://auth/callback?code=valid_code123&next=reset'), { kind: 'code', code: 'valid_code123', destination: '/auth/reset-password' })
   assert.deepEqual(parseNativeAuthReturn('uk.co.upcatch.app://auth/callback?token_hash=abcdefghijklmnop&type=recovery'), { kind: 'confirmation', tokenHash: 'abcdefghijklmnop', type: 'recovery' })
-  assert.deepEqual(parseNativeAuthReturn('uk.co.upcatch.app://auth/callback?error=access_denied'), { kind: 'error' })
+  assert.deepEqual(parseNativeAuthReturn('uk.co.upcatch.app://auth/callback?error=access_denied'), { kind: 'error', recovery: false })
+  assert.deepEqual(parseNativeAuthReturn('uk.co.upcatch.app://auth/callback?next=reset&error=access_denied&error_code=otp_expired'), { kind: 'error', recovery: true })
 })
 
 test('cold and warm delivery of the same URL is handled once', async () => {

@@ -12,6 +12,12 @@ import './login-background.css'
 type Runtime = Awaited<ReturnType<typeof createNativeRuntime>>
 type Navigate = (path: string) => void
 type Ready = () => Promise<void>
+const PENDING_EMAIL = 'upcatch:pending-email'
+const PENDING_EMAIL_SENT_AT = 'upcatch:pending-email-sent-at'
+function rememberPendingEmail(email: string) {
+  window.sessionStorage.setItem(PENDING_EMAIL, email)
+  window.sessionStorage.setItem(PENDING_EMAIL_SENT_AT, String(Date.now()))
+}
 
 function ErrorLine({ message }: { message: string }) {
   return message ? <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{message}</p> : null
@@ -59,45 +65,63 @@ export function LoginScreen({ runtime, navigate, ready, notice }: { runtime: Run
 export function SignUpScreen({ runtime, navigate }: { runtime: Runtime; navigate: Navigate }) {
   const [accepted, setAccepted] = useState(false)
   const form = useFormAction(async data => {
-    await runtime.authFlow.signUp(String(data.get('email') || ''), String(data.get('password') || ''), data.get('accept_terms') === 'on')
+    const email = String(data.get('email') || '')
+    await runtime.authFlow.signUp(email, String(data.get('password') || ''), data.get('accept_terms') === 'on')
+    rememberPendingEmail(email)
     navigate('/auth/check-email')
   })
   const [googleError, setGoogleError] = useState('')
   return <AccountShell title="Join UpCatch" description="Create an account to meet new friends in Manchester.">
     <ErrorLine message={googleError} />
-    <PrimaryButton onClick={() => { if (!accepted) { setGoogleError('Please accept the Terms of use to create an account.'); return } void runtime.authFlow.startGoogle(true).catch(error => setGoogleError(error instanceof Error ? error.message : 'Google sign-in failed.')) }} className="w-full">Continue with Google</PrimaryButton>
+    <label className="flex items-start gap-3 text-sm"><input type="checkbox" name="accept_terms" checked={accepted} onChange={event => setAccepted(event.target.checked)} className="mt-1" /><span>I accept the Terms of use and privacy notice.</span></label>
+    <PrimaryButton onClick={() => { if (!accepted) return; void runtime.authFlow.startGoogle(true).catch(error => setGoogleError(error instanceof Error ? error.message : 'Google sign-in failed.')) }} disabled={!accepted} className="w-full">Continue with Google</PrimaryButton>
     <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Or continue with email</p>
     <form onSubmit={form.submit} className="space-y-5">
       <Field label="Email" name="email" type="email" autoComplete="email" required />
       <Field label="Password" name="password" type="password" autoComplete="new-password" minLength={12} required />
-      <label className="flex items-start gap-3 text-sm"><input type="checkbox" name="accept_terms" checked={accepted} onChange={event => setAccepted(event.target.checked)} required className="mt-1" /><span>I accept the Terms of use and privacy notice.</span></label>
+      {accepted && <input type="hidden" name="accept_terms" value="on" />}
       <ErrorLine message={form.error} />
-      <PrimaryButton type="submit" disabled={form.busy} className="w-full">{form.busy ? 'Please wait…' : 'Create account'}</PrimaryButton>
+      <PrimaryButton type="submit" disabled={form.busy || !accepted} className="w-full">{form.busy ? 'Please wait…' : 'Create account'}</PrimaryButton>
     </form>
     <button className="text-sm font-bold text-primary" onClick={() => navigate('/auth/login')}>Already a member? Sign in</button>
   </AccountShell>
 }
 
 export function CheckEmailScreen({ runtime, navigate, reset = false }: { runtime: Runtime; navigate: Navigate; reset?: boolean }) {
+  const [email, setEmail] = useState(() => window.sessionStorage.getItem(PENDING_EMAIL) || '')
+  const [deadline, setDeadline] = useState(() => Number(window.sessionStorage.getItem(PENDING_EMAIL_SENT_AT) || 0) + 60_000)
+  const [now, setNow] = useState(Date.now())
+  const seconds = Math.max(0, Math.ceil((deadline - now) / 1000))
+  useEffect(() => {
+    if (!seconds) return
+    const timer = window.setTimeout(() => setNow(Date.now()), 1000)
+    return () => window.clearTimeout(timer)
+  }, [seconds])
   const form = useFormAction(async data => {
-    const email = String(data.get('email') || '')
-    if (reset) await runtime.authFlow.requestPasswordReset(email)
-    else await runtime.authFlow.resendConfirmation(email)
+    const address = email || String(data.get('email') || '')
+    if (!address) throw new Error('Enter your email to request a link.')
+    if (reset) await runtime.authFlow.requestPasswordReset(address)
+    else await runtime.authFlow.resendConfirmation(address)
+    rememberPendingEmail(address)
+    setEmail(address)
+    setDeadline(Date.now() + 60_000)
+    setNow(Date.now())
   })
   return <AccountShell title="Check your email" description={reset ? 'Use the recovery link sent to your email, then return to UpCatch.' : 'Use the confirmation link sent to your email, then return to UpCatch.'}>
     <form onSubmit={form.submit} className="space-y-5">
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+      {!email && <Field label="Email" name="email" type="email" autoComplete="email" required />}
       <ErrorLine message={form.error} />
       {form.complete && <p role="status" className="rounded-xl bg-primary/10 p-3 text-sm">If this address is eligible, a link is on its way.</p>}
-      <PrimaryButton type="submit" disabled={form.busy} className="w-full">{reset ? 'Resend recovery link' : 'Resend confirmation'}</PrimaryButton>
+      <PrimaryButton type="submit" disabled={form.busy || seconds > 0} className="w-full">{seconds ? `Resend in ${seconds}s` : reset ? 'Resend recovery link' : 'Resend confirmation'}</PrimaryButton>
     </form>
     <button className="text-sm font-bold text-primary" onClick={() => navigate('/auth/login')}>Back to sign in</button>
   </AccountShell>
 }
 
-export function ForgotScreen({ runtime, navigate }: { runtime: Runtime; navigate: Navigate }) {
-  const form = useFormAction(async data => { await runtime.authFlow.requestPasswordReset(String(data.get('email') || '')); navigate('/auth/check-email?reset=1') })
+export function ForgotScreen({ runtime, navigate, expired = false }: { runtime: Runtime; navigate: Navigate; expired?: boolean }) {
+  const form = useFormAction(async data => { const email=String(data.get('email') || ''); await runtime.authFlow.requestPasswordReset(email); rememberPendingEmail(email); navigate('/auth/check-email?reset=1') })
   return <AccountShell title="Reset your password" description="We'll email a recovery link if this address has a password account.">
+    {expired && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">That reset link has expired or was already used. Request a new link below.</p>}
     <form onSubmit={form.submit} className="space-y-5">
       <Field label="Email" name="email" type="email" autoComplete="email" required />
       <ErrorLine message={form.error} />

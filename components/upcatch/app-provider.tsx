@@ -471,7 +471,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
         return true
       }catch(error){
         if(savedLocation.current&&!(error instanceof LocationError&&error.status==='denied')){
-          setLocationStatus('granted');return true
+          setLocationStatus('granted');return !refresh
         }
         savedLocation.current=null
         setLocationStatus(error instanceof LocationError?error.status:'unavailable')

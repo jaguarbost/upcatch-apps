@@ -92,10 +92,11 @@ test('onboarding status outage does not route a member into the app',async()=>{
  });
  await assert.rejects(()=>Page(),/onboarding status could not be loaded/);
 });
-for(const [query,fails,destination] of [['code=ok',false,'/start'],['code=ok&next=reset',false,'/auth/reset-password'],['code=bad',true,'/auth/login?oauth_error=1'],['error=access_denied',false,'/auth/login?oauth_error=1']]){
+for(const [query,fails,destination] of [['code=ok',false,'/start'],['code=ok&next=reset',false,'/auth/reset-password'],['code=bad',true,'/auth/login?oauth_error=1'],['error=access_denied',false,'/auth/login?oauth_error=1'],['error=access_denied&error_code=otp_expired&next=reset',false,'/auth/forgot-password?expired=1']]){
  test('callback '+query+' redirects safely to '+destination,async()=>{
   const {GET}=await load('app/auth/callback/route.ts',{
-   '@/lib/supabase/server':{createClient:async()=>({auth:{exchangeCodeForSession:async()=>({error:fails?{}:null})}})},
+   '@/lib/supabase/server':{createClient:async()=>({auth:{exchangeCodeForSession:async()=>({error:fails?{}:null}),getUser:async()=>({data:{user:null}})}})},
+   'next/headers':{cookies:async()=>({get:()=>null})},
   });
   const response=await GET(new Request('https://www.upcatch.co.uk/auth/callback?'+query));
   assert.equal(response.headers.get('location'),'https://www.upcatch.co.uk'+destination);
@@ -120,7 +121,7 @@ async function authActions(google){
   '@/lib/server/signin-policy':{emailUsesGoogle:async()=>google,signinPolicy:async()=>({allowed:!google,google_required:google})},
   '@/lib/forms':{emailValue:form=>form.get('email'),passwordValue:form=>form.get('password')},
  });
- const form=new FormData();form.set('email','member@example.com');form.set('password','example-password');
+ const form=new FormData();form.set('email','member@example.com');form.set('password','example-password');form.set('accept_terms','on');
  return {actions,calls,form,signal};
 }
 test('Google-linked password sign-in signs out instead of routing to the app',async()=>{

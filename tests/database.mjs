@@ -119,6 +119,15 @@ try {
   check((await db.query(`select public.begin_notification_delivery('${retry.id}','${retry.lease_token}') allowed`)).rows[0].allowed,'First provider attempt records its replay window')
   await db.exec(`update private.notification_jobs set provider_attempted_at=now()-interval '25 hours' where id='${retry.id}'`)
   check(!(await db.query(`select public.begin_notification_delivery('${retry.id}','${retry.lease_token}') allowed`)).rows[0].allowed,'Ambiguous email is not replayed after provider deduplication expires')
+  await db.exec(`insert into private.notification_jobs(user_id,event_key,kind,payload)
+    values('${a}','inbox-test:${a}','friend_push','{"title":"A friend is free","text":"Open UpCatch to connect.","route":"nudges"}'::jsonb)`)
+  const ownInbox=await asUser(a,()=>db.query("select title,destination,read_at from public.member_notifications where event_key='inbox-test:"+a+"'"))
+  check(ownInbox.rows.length===1 && ownInbox.rows[0].destination==='nudges','Notification job creates a persistent inbox item for its recipient')
+  const otherInbox=await asUser(b,()=>db.query("select id from public.member_notifications where event_key='inbox-test:"+a+"'"))
+  check(otherInbox.rows.length===0,'Members cannot read another member’s inbox')
+  await asUser(a,()=>db.exec("update public.member_notifications set read_at=now() where event_key='inbox-test:"+a+"'"))
+  const marked=await asUser(a,()=>db.query("select read_at is not null as read from public.member_notifications where event_key='inbox-test:"+a+"'"))
+  check(marked.rows[0].read,'Recipients can mark their own notification as read')
   const venue=(await db.query('select id from public.venues limit 1')).rows[0].id
   await reject(`insert into public.meetups(city_id,venue_id,host_id,starts_at,ends_at)
     values('${second}','${venue}','${a}',now(),now()+interval '1 hour')`,'Meetup venue cannot cross city boundaries')
@@ -295,6 +304,7 @@ try {
    });
    await asUser(e,async()=>{
     check((await db.query('select public.my_live_state() s')).rows[0].s.messages[0].from==='them','Peer reads shared meetup message');
+    check((await db.query("select count(*)::int n from public.member_notifications where destination='messages' and chat='live'")).rows[0].n===1,'Chat message appears in recipient inbox with push disabled');
     await reject("select public.friend_from_meetup('"+mid+"')",'Friendship cannot be requested before both arrive');
     for(let i=0;i<10;i++)await db.query('select public.send_meetup_message($1)',['Message '+i]);
     await reject("select public.send_meetup_message('Too many')",'Chat rate limit is enforced');
@@ -359,15 +369,8 @@ try {
   }
 
   {
-   await db.exec('delete from private.match_queue');
-   const located=randomUUID(),peer=randomUUID();
-   await db.query('insert into auth.users values($1,$2,now()),($3,$4,now())',[located,'map1@example.com',peer,'map2@example.com']);
-   await db.query("update public.profiles set photo_path=id::text||'/map.jpg',display_name='Map',home_city_id=$1,adult_declared_at=now(),onboarding_completed_at=now() where id in ($2,$3)",[city,located,peer]);
-   await asUser(located,async()=>{await db.query('select public.save_member_settings($1)',[JSON.stringify({latitude:53.481234,longitude:-2.241234})]);await db.exec("select public.go_online('coffee',30)");check((await db.query('select public.my_partner_location() s')).rows[0].s===null,'No peer location is exposed while unmatched')});
-   await asUser(peer,async()=>{await db.query('select public.save_member_settings($1)',[JSON.stringify({latitude:53.481999,longitude:-2.241999})]);await db.exec("select public.go_online('coffee',30)");check((await db.query('select public.my_partner_location() s')).rows[0].s===null,'Second member cannot read peer area before first acceptance')});
-   await asUser(located,async()=>{const area=(await db.query('select public.my_partner_location() s')).rows[0].s;check(area.latitude===53.48&&area.longitude===-2.24&&Boolean(area.updated_at),'First member sees only rounded, timestamped partner area');await db.exec("select public.meetup_command('accept')")});
-   await asUser(peer,async()=>{check(Boolean((await db.query('select public.my_partner_location() s')).rows[0].s),'Second member receives partner area after first acceptance');await db.exec("select public.meetup_command('cancel')");check((await db.query('select public.my_partner_location() s')).rows[0].s===null,'Cancelled meetup no longer exposes peer area')});
-   await asUser(b,async()=>{check((await db.query('select public.my_partner_location() s')).rows[0].s===null,'Unrelated member cannot read partner area')});
+   // The 202610040002 privacy migration removed the partner-location RPC.
+   check((await db.query("select to_regprocedure('public.my_partner_location()') is null as removed")).rows[0].removed,'Partner-location RPC remains unavailable');
   }
   {
    const linked=randomUUID();

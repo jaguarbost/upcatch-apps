@@ -20,6 +20,9 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
       if (error.code === 'weak_password') return { error: 'Choose a stronger password.' }
       return { error: 'Signup could not be completed. Check your details or try again shortly.' }
     }
+    const pending=await cookies()
+    pending.set('upcatch-pending-email',emailValue(form),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/auth',maxAge:3600})
+    pending.set('upcatch-confirmation-sent-at',String(Date.now()),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/auth',maxAge:3600})
     // Only sign out a real auto-session; an unconditional sign-out also deletes the PKCE verifier the email link needs.
     if (data.session) await supabase.auth.signOut()
   } catch (error) { return { error: error instanceof Error ? error.message : 'Signup failed.' } }
@@ -47,9 +50,16 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
 export async function resendConfirmation(_: FormState, form: FormData): Promise<FormState> {
   try {
     const supabase = await createClient()
-    await supabase.auth.resend({ type: 'signup', email: emailValue(form),
+    const pending=await cookies()
+    const email=pending.get('upcatch-pending-email')?.value || emailValue(form)
+    const sentAt=Number(pending.get('upcatch-confirmation-sent-at')?.value || 0)
+    if (Number.isFinite(sentAt) && Date.now()-sentAt < 60_000) return { error: 'Please wait 60 seconds before resending.' }
+    const { error }=await supabase.auth.resend({ type: 'signup', email,
       options: { emailRedirectTo: authCallbackUrl() } })
-    return { message: 'If your account needs confirmation, a link will arrive shortly. Please wait a minute before requesting another.' }
+    if (error) return { error: 'Could not resend confirmation right now. Please try again shortly.' }
+    pending.set('upcatch-pending-email',email,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/auth',maxAge:3600})
+    pending.set('upcatch-confirmation-sent-at',String(Date.now()),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/auth',maxAge:3600})
+    return { message: 'If your account needs confirmation, a link will arrive shortly.' }
   } catch { return { error: 'Enter a valid email and try again shortly.' } }
 }
 export async function requestReset(_: FormState, form: FormData): Promise<FormState> {

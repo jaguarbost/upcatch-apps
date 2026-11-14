@@ -7,14 +7,14 @@ export const NATIVE_AUTH_CALLBACK = 'uk.co.upcatch.app://auth/callback'
 export type NativeAuthReturn =
   | { kind: 'code'; code: string; destination: '/start' | '/auth/reset-password' }
   | { kind: 'confirmation'; tokenHash: string; type: 'signup' | 'recovery' | 'email_change' }
-  | { kind: 'error' }
+  | { kind: 'error'; recovery: boolean }
 
 export function parseNativeAuthReturn(raw: string): NativeAuthReturn | null {
   let url: URL
   try { url = new URL(raw) } catch { return null }
   if (url.protocol !== 'uk.co.upcatch.app:' || url.hostname !== 'auth' || url.pathname !== '/callback' || url.username || url.password) return null
   const params = url.searchParams
-  if (params.has('error') || url.hash.includes('error=')) return { kind: 'error' }
+  if (params.has('error') || new URLSearchParams(url.hash.slice(1)).has('error')) return { kind: 'error', recovery: params.get('next') === 'reset' }
   const code = params.get('code')
   const tokenHash = params.get('token_hash')
   if (code && !tokenHash && /^[A-Za-z0-9_-]{8,512}$/.test(code)) {

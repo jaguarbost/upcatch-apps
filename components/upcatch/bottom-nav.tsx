@@ -38,6 +38,7 @@ export function BottomNav() {
     >
       <div className="flex items-end">
         {item('wall', 'Wall', <LayoutGrid className="size-5" aria-hidden="true" />)}
+        {item('nudges', 'Nudge', <Send className="size-5" aria-hidden="true" />)}
 
         <div className="flex min-w-0 flex-1 justify-center">
           <button
@@ -54,7 +55,6 @@ export function BottomNav() {
           </button>
         </div>
 
-        {item('nudges', 'Nudge', <Send className="size-5" aria-hidden="true" />)}
         {item('meetups', 'Meetups', <CalendarCheck2 className="size-5" aria-hidden="true" />)}
         {item(
           'profile',

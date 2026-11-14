@@ -13,6 +13,7 @@ export function NudgeFriendsScreen() {
   const [nearbyIds, setNearbyIds] = useState<Set<string> | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [locationRefreshFailed, setLocationRefreshFailed] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!state.live) { setNearbyIds(new Set()); return }
@@ -29,6 +30,22 @@ export function NudgeFriendsScreen() {
     window.addEventListener('focus', onFocus)
     return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus) }
   }, [refresh])
+
+  useEffect(() => {
+    if (!state.live || state.locationStatus !== 'granted') return
+    let active = true
+    const update = async () => {
+      const saved = await actions.requestLocation(false, true)
+      if (!active) return
+      setLocationRefreshFailed(!saved)
+      await refresh()
+    }
+    void update()
+    const timer = window.setInterval(() => { void update() }, 30 * 60 * 1000)
+    const onFocus = () => { void update() }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', onFocus) }
+  }, [state.live, state.locationStatus, actions.requestLocation, refresh])
 
   const send = async (recipient: string | null) => {
     if (!state.live || busy) return
@@ -49,7 +66,8 @@ export function NudgeFriendsScreen() {
     setBusy(true); setNotice('')
     try {
       const updated = await actions.requestLocation(true, true)
-      if (!updated) { setNotice('Could not update your location. Please try again.'); return }
+      if (!updated) { setLocationRefreshFailed(true); setNotice('Could not update your location. Please try again.'); return }
+      setLocationRefreshFailed(false)
       await refresh()
     }
     catch { setNotice('Could not update your location. Please try again.') }
@@ -76,7 +94,7 @@ export function NudgeFriendsScreen() {
     <section className="mx-4 mt-4 rounded-3xl bg-card p-4" aria-labelledby="send-nudges">
       <div className="flex items-center justify-between gap-3"><h2 id="send-nudges" className="flex items-center gap-2 font-display text-lg font-extrabold"><Users className="size-5 text-primary" aria-hidden="true" /> Nearby friends</h2><span className="text-xs font-bold text-muted-foreground">{nearbyFriends.length}</span></div>
       <p className="mt-2 text-xs text-muted-foreground">Within 3 miles, based on both members’ approximate locations from the last hour.</p>
-      <button type="button" disabled={busy || !state.live} onClick={() => void updateLocation()} className="press mt-3 flex min-h-10 items-center gap-2 text-sm font-bold text-primary disabled:opacity-50"><MapPin className="size-4" aria-hidden="true" /> Update my location</button>
+      {state.live && state.locationStatus !== 'loading' && (state.locationStatus !== 'granted' || locationRefreshFailed) && <button type="button" disabled={busy} onClick={() => void updateLocation()} className="press mt-3 flex min-h-10 items-center gap-2 text-sm font-bold text-primary disabled:opacity-50"><MapPin className="size-4" aria-hidden="true" /> {state.locationStatus === 'granted' ? 'Retry location' : 'Enable location'}</button>}
       {nearbyIds === null ? <p className="mt-3 text-sm text-muted-foreground">Checking nearby friends…</p> : nearbyFriends.length ? <>
         <PrimaryButton variant="live" disabled={busy || !state.live} onClick={() => void send(null)} className="mt-4 w-full"><Send className="size-4" aria-hidden="true" /> Nudge all nearby friends</PrimaryButton>
         <p className="mt-2 text-xs text-muted-foreground">You can nudge everyone nearby once every 6 hours. Friends with a pending nudge are skipped.</p>
@@ -85,7 +103,7 @@ export function NudgeFriendsScreen() {
           <div className="min-w-0 flex-1"><p className="font-semibold">{friend.person.name}</p><p className="text-xs text-muted-foreground">{friend.status === 'free' ? 'Online' : 'Offline'}</p></div>
           <button type="button" disabled={busy || !state.live} onClick={() => void send(friend.person.id)} className="press min-h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50">Nudge</button>
         </li>)}</ul>
-      </> : <p className="mt-3 text-sm text-muted-foreground">No friends nearby right now. Update your location or try again when a friend is close.</p>}
+      </> : <p className="mt-3 text-sm text-muted-foreground">{state.locationStatus === 'loading' ? 'Finding nearby friends…' : state.locationStatus === 'granted' && !locationRefreshFailed ? 'No friends nearby right now. Try again when a friend is close.' : 'Allow location to find nearby friends.'}</p>}
     </section>
   </main>
 }
