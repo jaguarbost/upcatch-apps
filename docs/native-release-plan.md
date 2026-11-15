@@ -10,6 +10,7 @@
 
 - Adapted the native-relevant screen changes from web commits `da32fa2` and `5bd23a1`. Added dedicated meetup Messages navigation, tappable real profiles, the yellow QR friendship footer, Not now wording, native photo replacement and hosted legal links. Preserved native startup, appearance, auth, permissions, QR and notification integrations; did not import marketing screens or metadata.
 - Local typecheck, production build, native tests (52), image tests (4), push tests (13), Vite production bundle, Capacitor sync and native metadata/release checks passed. Version 2.0.3/build 9. See [native-meetup-profile-validation.md](native-meetup-profile-validation.md) for behavior and acceptance evidence.
+- Fresh signed AAB: `android/app/build/outputs/bundle/release/app-release.aab` (20,959,759 bytes), SHA-256 `5A068BA7655DBBE4DAEC25F8BA6DE6CFB5B54D2A79CA3019598D248B4E1403BB`. Reused the existing signing key; jarsigner signature verification and bundletool validation passed. Packaged version 2.0.3/code 9 confirmed. UI code pushed to Capacitor main at `8ec2895`; no other repository was pushed.
 - No Android device is attached; iOS archive/upload and device-level messaging, profile expiry, QR permissions, photo persistence after relaunch, legal links and appearance remain unverified. No database changes, web deployment or store upload. Milestones remain 25% (3/12).
 
 ## iOS upload correction — build 8 — 2026-11-15

@@ -21,6 +21,16 @@ Read web commits `da32fa2ee5da383a42a3cfd41923429bc871ede8` and `5bd23a18a7bb9ce
 - `pnpm native:bundle`, `pnpm native:sync`, `pnpm native:check`, `pnpm native:release-check`: passed. Vite retained its existing ignored `use client`/sourcemap and large-chunk warnings; output was generated successfully.
 - Inspected the source diff for unintended protected-file changes. No database/schema/migration or production data changes. No dependency or lockfile changes.
 
+## Signed Android artifact
+
+Built with `scripts/build-android-aab.ps1 -Offline -RequireExistingKey`, reusing the existing upload key outside the repository. No replacement key was generated or displayed. `jarsigner` verified the signature; bundletool 1.18.3 validated the AAB and read versionCode **9**, versionName **2.0.3**. The archive contains the newly generated `index-DlQoYlX_.js` native bundle.
+
+- Path: `C:\Users\dipti\upcatch-capacitor\android\app\build\outputs\bundle\release\app-release.aab`
+- Size: **20,959,759 bytes**
+- SHA-256: `5A068BA7655DBBE4DAEC25F8BA6DE6CFB5B54D2A79CA3019598D248B4E1403BB`
+
+The build emitted an SDK XML version warning but completed successfully. No APK was requested/rebuilt for this release; any older APK at the prior output path is not build 9. No Play Store upload was performed. UI/source commit `8ec2895` was pushed only to `jaguarbost/upcatch-apps` main.
+
 ## Device and hosted acceptance still needed
 
 ADB reported no attached Android device. No physical iOS device or macOS/Xcode archive was available. Automated component tests use mocked hooks/events, not a rendered device or browser.
