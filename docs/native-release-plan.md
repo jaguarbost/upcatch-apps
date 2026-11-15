@@ -6,6 +6,14 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Android signed release build 7 — 2026-11-15
+
+- Source was pushed to Capacitor `main` first (`c136253`, then iOS URL-routing follow-up `226f777`). No web-repository push, website deployment, production database mutation or store upload was performed for this release.
+- Reused the existing upload key with `scripts/build-android-aab.ps1 -Offline -RequireExistingKey -IncludeApk`. Both Gradle release targets passed. `jarsigner` verified the AAB and `apksigner` verified the release APK. Google bundletool 1.18.3 validated the final AAB and read version code `7`, version name `2.0.2`; `aapt` confirmed the APK has the same metadata and package `uk.co.upcatch.app`.
+- **AAB:** `android/app/build/outputs/bundle/release/app-release.aab`, 20,959,238 bytes, SHA-256 `FA4458A9BCA3FD2D271787E371F999174B00A3FEB9525032EAA39634CD1C749C`.
+- **APK:** `android/app/build/outputs/apk/release/app-release.apk`, 19,614,904 bytes, SHA-256 `5E414460D59A7091E3B3DA1062CDA53E960170EB28D026FA0C52465E93BE7026`.
+- ADB listed no attached device. Actual Auto/resume behavior, incoming-profile countdown, chat timestamp appearance, notification navigation/delivery and QR/permission regressions remain device acceptance items. No iOS archive or TestFlight upload was produced from this Windows workspace. Milestones remain at 25% (3/12).
+
 ## Native 2.0.2/build 7: web UI adaptation — 2026-11-14
 
 - Adapted the requested night mode, incoming View profile and nudge UI from web main `7a76dc7`, rechecked at `5e5cd5a`. Added Auto mode following the user's subsequent instruction, with device-local Auto/manual settings in Profile. Added the UpCatch home wordmark and Never go alone beneath the splash icon. Preserved native auth/deep links, QR behavior, private-image and permission bridges, fonts, blue/yellow accents, existing QR layout and map behavior. Nudge is already left of Online/Offline. Meetup start timing was explicitly deferred and remains unchanged.
@@ -14,7 +22,7 @@
 - **Local:** `pnpm typecheck`, `pnpm build`, `pnpm native:bundle`, `pnpm native:sync`, `pnpm native:check`, `pnpm native:release-check`, `pnpm test:native` (46), `pnpm test:push` (13) and `pnpm test:db` (290) passed. The generated splash was visually inspected. Version is 2.0.2/build 7 for the iOS URL-routing follow-up; signed Android AAB/APK generation follows the code push using the existing key. See [native-night-mode-validation.md](native-night-mode-validation.md) for acceptance steps and [web-push-handoff.md](web-push-handoff.md) for the separate web-workspace prompt.
 - **Notification follow-up:** Source commit `c136253` was pushed before Android signing. Added the documented iOS URL-suppression setting so the native click listener controls navigation. Read-only inspection confirmed cancellation pushes for drafts with zero acceptances and HTTP 400 on new message/nudge pushes; the web agent is preparing separate `web_url`/`app_url` payloads. Missing scheduled-acceptance alerts and draft-cancellation suppression are documented for the web project, without changing its database or deployment here.
 - **Security audit:** After code push, `pnpm audit --json` reported 4 critical/40 high; production-declared dependencies reported 4 critical/35 high. See [dependency-vulnerability-audit-20261114.md](dependency-vulnerability-audit-20261114.md). Server/tool dependency findings do not establish native runtime exploitability. No dependency upgrades were applied.
-- **Release boundary:** No web deployment, production environment change or production database write for this update. No new signed binary, TestFlight upload or physical-device/UI acceptance was verified. Milestone completion remains 25% (3/12).
+- **Release boundary:** No web deployment, production environment change or production database write for this update. Signed Android artifacts were subsequently verified as recorded above; no iOS archive, TestFlight upload or physical-device/UI acceptance was verified. Milestone completion remains 25% (3/12).
 
 ## Push availability rules and TestFlight investigation — 2026-11-14
 

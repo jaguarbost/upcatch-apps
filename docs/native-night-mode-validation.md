@@ -21,6 +21,17 @@ Passed `pnpm typecheck`, `pnpm build`, `pnpm native:bundle`, `pnpm test:native` 
 
 Version metadata is aligned at 2.0.2/build 7 for the iOS URL-routing follow-up, avoiding a duplicate if build 6 was uploaded to TestFlight. Local native sync/release checks precede the code push. Signed Android AAB/APK generation follows the source push using the existing upload key and `scripts/build-android-aab.ps1 -RequireExistingKey -IncludeApk`. No signed iOS archive, TestFlight upload, physical-device visual test or browser automation was performed. ADB listed no attached Android device, so actual theme changes, preview/countdown, timestamps and notification taps remain device acceptance items.
 
+### Final signed Android artifacts
+
+Built after source push on 15 November 2026 with the existing signing key. AAB signature verified with jarsigner; APK signature verified with apksigner. Bundletool validated the AAB and reported 2.0.2/build 7; aapt verified the APK version/package metadata.
+
+| Artifact | Exact local path | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| Play release AAB | `C:\Users\dipti\upcatch-capacitor\android\app\build\outputs\bundle\release\app-release.aab` | 20,959,238 | `FA4458A9BCA3FD2D271787E371F999174B00A3FEB9525032EAA39634CD1C749C` |
+| Signed release APK for testing | `C:\Users\dipti\upcatch-capacitor\android\app\build\outputs\apk\release\app-release.apk` | 19,614,904 | `5E414460D59A7091E3B3DA1062CDA53E960170EB28D026FA0C52465E93BE7026` |
+
+No artifact was uploaded to Play Store. The APK has not been installed/tested on a device in this session.
+
 ## Read-only hosted findings
 
 The migration journal confirms all five web nudge migrations are already applied. Recent message and nudge push jobs still report No subscribed device was available. This update does not establish that automatic push delivery or OneSignal click reporting is fixed. Manual OneSignal delivery was reported by the user; Safari-to-app nudge delivery was reported unsuccessful. See [web-push-handoff.md](web-push-handoff.md).
