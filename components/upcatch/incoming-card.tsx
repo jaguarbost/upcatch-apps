@@ -66,10 +66,10 @@ export function IncomingCard({ offer }: { offer: Offer }) {
       </div>
 
       <div className="mt-3 flex items-center gap-4">
-        <PersonAvatar photo={offer.person.photo} initials={offer.person.initials} size={68} />
+        <button type="button" disabled={left <= 0} onClick={() => setProfileOpen(true)} aria-label={`View ${offer.person.name} profile`} aria-haspopup="dialog" className="press shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-primary"><PersonAvatar photo={offer.person.photo} initials={offer.person.initials} size={68} /></button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-baseline gap-2">
-            <h2 className="font-display text-2xl font-extrabold">{offer.person.name}</h2>
+            <h2 className="font-display text-2xl font-extrabold"><button type="button" disabled={left <= 0} onClick={() => setProfileOpen(true)} className="press text-left">{offer.person.name}</button></h2>
             <span className="text-muted-foreground">{state.live ? '18+' : offer.person.age}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">

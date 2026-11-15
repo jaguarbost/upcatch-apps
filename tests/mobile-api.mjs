@@ -12,6 +12,19 @@ new Function('require', 'exports', js)(name => { throw Error(`Unexpected import:
 
 function session(id, token) { return { user: { id }, access_token: token } }
 
+test('photo replacement sends authenticated multipart photo to the mobile endpoint', async () => {
+  const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
+  const client = new api.MobileApi('https://api.example', auth, async (url, init) => {
+    assert.equal(url, 'https://api.example/api/mobile/profile-photo')
+    assert.equal(init.method, 'POST')
+    assert.equal(init.headers.get('Authorization'), 'Bearer token-a')
+    assert.equal(init.headers.has('Content-Type'), false, 'fetch supplies multipart boundary')
+    assert.equal(await init.body.get('photo').text(), 'photo-bytes')
+    return Response.json({ message: 'Saved' })
+  })
+  assert.deepEqual(await client.uploadPhoto(new File(['photo-bytes'], 'profile.jpg', { type: 'image/jpeg' })), { message: 'Saved' })
+})
+
 test('mobile API calls the browser fetch with its global receiver', async () => {
   const originalFetch = globalThis.fetch
   const auth = {

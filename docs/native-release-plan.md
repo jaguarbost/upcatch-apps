@@ -6,6 +6,12 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Native meetup/profile adaptation — 2.0.3/build 9 — 2026-11-15
+
+- Adapted the native-relevant screen changes from web commits `da32fa2` and `5bd23a1`. Added dedicated meetup Messages navigation, tappable real profiles, the yellow QR friendship footer, Not now wording, native photo replacement and hosted legal links. Preserved native startup, appearance, auth, permissions, QR and notification integrations; did not import marketing screens or metadata.
+- Local typecheck, production build, native tests (52), image tests (4), push tests (13), Vite production bundle, Capacitor sync and native metadata/release checks passed. Version 2.0.3/build 9. See [native-meetup-profile-validation.md](native-meetup-profile-validation.md) for behavior and acceptance evidence.
+- No Android device is attached; iOS archive/upload and device-level messaging, profile expiry, QR permissions, photo persistence after relaunch, legal links and appearance remain unverified. No database changes, web deployment or store upload. Milestones remain 25% (3/12).
+
 ## iOS upload correction — build 8 — 2026-11-15
 
 - Added `NSLocationAlwaysAndWhenInUseUsageDescription` required by the installed Capacitor geolocation plugin, using the same nearby-member purpose as the existing When In Use description. Location requests and background modes are unchanged; background location is not enabled.

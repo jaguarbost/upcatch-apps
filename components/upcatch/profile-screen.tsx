@@ -21,6 +21,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
+import { PhotoUpload } from '@/components/account/photo-upload'
 import { version as appVersion } from '@/package.json'
 import { InstallAppCard, NotificationHelp } from '@/components/account/install-app'
 import { LearnMoreButton } from './how-it-works'
@@ -76,6 +78,11 @@ export function ProfileScreen() {
           </div>
         </div>
       </header>
+
+      {state.live && <details className="mx-4 mt-4 rounded-3xl bg-card p-4">
+        <summary className="cursor-pointer text-center text-sm font-bold text-primary">Change profile photo</summary>
+        <div className="mt-4"><PhotoUpload /></div>
+      </details>}
 
       <section className="mx-4 mt-5 grid grid-cols-3 gap-2 text-center" aria-label="Your stats">
         <Stat value={String(state.live ? state.profileStats.completed_meetups : state.history.length + 5)} label="UpCatches" />
@@ -247,6 +254,10 @@ export function ProfileScreen() {
           <RotateCcw className="size-4" aria-hidden="true" /> {state.live ? 'Sign out' : 'Restart demo from onboarding'}
         </button>
       </div>
+      <nav aria-label="Legal" className="mt-5 flex justify-center gap-6 text-sm font-semibold text-primary">
+        <Link href="/terms" className="min-h-11 content-center underline underline-offset-4">Terms</Link>
+        <Link href="/privacy" className="min-h-11 content-center underline underline-offset-4">Privacy</Link>
+      </nav>
       <p className="pb-4 pt-3 text-center text-xs text-muted-foreground">Version {appVersion.replace(/\.0$/, '')}</p>
       {removeTarget&&<div className="absolute inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4"><section role="dialog" aria-modal="true" aria-label="Remove friend" className="w-full max-w-md rounded-3xl bg-card p-5"><h2 className="font-display text-2xl font-extrabold">Remove {removeTarget.name}?</h2><p className="mt-3 text-sm text-muted-foreground">You will no longer appear in each other&apos;s friends-only matching pool.</p><div className="mt-5 flex gap-3"><button type="button" className="press min-h-12 flex-1 rounded-2xl bg-muted font-bold" onClick={()=>setRemoveTarget(null)}>Keep friend</button><button type="button" className="press min-h-12 flex-1 rounded-2xl bg-destructive font-bold text-destructive-foreground" onClick={()=>{actions.removeFriend(removeTarget.id);setRemoveTarget(null)}}>Remove</button></div></section></div>}
       {(blocked!==null||guidelines)&&<div className="absolute inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4"><section role="dialog" aria-modal="true" aria-label={guidelines?'Community guidelines':'Blocked people'} className="w-full max-w-md rounded-3xl bg-card p-5"><h2 className="font-display text-2xl font-extrabold">{guidelines?'Community guidelines':'Blocked people'}</h2>{guidelines?<p className="mt-4 text-sm leading-relaxed">Meet in public. Respect boundaries and consent. Be kind, arrive as agreed, and cancel if your plans change. Report harassment, unsafe behaviour, or misleading profiles through the safety centre.</p>:<ul className="mt-4 space-y-2">{blocked?.length===0&&<li className="text-sm text-muted-foreground">No blocked people.</li>}{blocked?.map(person=><li key={person.id} className="flex items-center justify-between rounded-2xl bg-muted p-3"><span>{person.name}</span><button type="button" className="press rounded-full bg-primary px-3 py-2 text-sm font-bold text-primary-foreground" onClick={()=>{void createClient().rpc('unblock_member',{p_user:person.id}).then(({error})=>{if(error){actions.showToast('Unblock failed.');return}setBlocked(people=>people?.filter(p=>p.id!==person.id)??[]);actions.showToast('Member unblocked.')})}}>Unblock</button></li>)}</ul>}<button type="button" className="press mt-4 min-h-12 w-full rounded-2xl bg-muted font-bold" onClick={()=>{setBlocked(null);setGuidelines(false)}}>Close</button></section></div>}

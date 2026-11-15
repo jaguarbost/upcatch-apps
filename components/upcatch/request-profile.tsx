@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react'
 import type { Person } from '@/lib/upcatch-data'
 import { Chip, CountdownRing, PersonAvatar, PrimaryButton, Verified } from './primitives'
 
-export function RequestProfile({ person, live, seconds, fraction, onClose }: {
-  person: Person; live: boolean; seconds: number; fraction: number; onClose: () => void
+export function RequestProfile({ person, live, seconds, fraction, returnLabel = 'Back to request', onClose }: {
+  person: Person; live: boolean; seconds?: number; fraction?: number; returnLabel?: string; onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -18,10 +18,10 @@ export function RequestProfile({ person, live, seconds, fraction, onClose }: {
   const showUp = live ? person.showUpPercent : null
 
   return <dialog ref={dialog} onClose={onClose} aria-labelledby="request-profile-name"
-    className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[440px] overflow-y-auto rounded-[2rem] border border-border bg-background p-5 text-foreground shadow-2xl backdrop:bg-black/60">
+    className="pointer-events-auto fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[440px] overflow-y-auto rounded-[2rem] border border-border bg-background p-5 text-foreground shadow-2xl backdrop:bg-black/60">
     <header className="flex items-center justify-between gap-3">
-      <button type="button" onClick={onClose} autoFocus className="press flex min-h-11 items-center gap-2 rounded-full bg-card px-3 text-sm font-bold"><ArrowLeft className="size-4" aria-hidden="true" /> Back to request</button>
-      <CountdownRing fraction={fraction} seconds={seconds} size={44} />
+      <button type="button" onClick={onClose} autoFocus className="press flex min-h-11 items-center gap-2 rounded-full bg-card px-3 text-sm font-bold"><ArrowLeft className="size-4" aria-hidden="true" /> {returnLabel}</button>
+      {fraction !== undefined && seconds !== undefined && <CountdownRing fraction={fraction} seconds={seconds} size={44} />}
     </header>
     <div className="mt-5 flex flex-col items-center gap-3 text-center">
       <PersonAvatar photo={person.photo} initials={person.initials} size={112} />
@@ -40,7 +40,7 @@ export function RequestProfile({ person, live, seconds, fraction, onClose }: {
       <h3 className="font-display text-lg font-bold">Interests</h3>
       <div className="mt-3 flex flex-wrap gap-2">{person.interests.length ? person.interests.map(interest => <Chip key={interest}>{interest}</Chip>) : <p className="text-sm text-muted-foreground">No interests shared yet.</p>}</div>
     </section>
-    <p className="mt-4 text-center text-xs text-muted-foreground">The request timer continues while you view this profile.</p>
-    <PrimaryButton onClick={onClose} className="mt-4 w-full">Back to request</PrimaryButton>
+    {seconds !== undefined && <p className="mt-4 text-center text-xs text-muted-foreground">The request timer continues while you view this profile.</p>}
+    <PrimaryButton onClick={onClose} className="mt-4 w-full">{returnLabel}</PrimaryButton>
   </dialog>
 }

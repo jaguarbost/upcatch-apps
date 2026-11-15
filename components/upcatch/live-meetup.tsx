@@ -1,36 +1,21 @@
 'use client'
 
-import { Check, Flag, MapPin, Navigation, QrCode, Send, ShieldAlert, Sparkles, X, Zap } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { haptic } from '@/lib/haptics'
-import { intentById, venueById } from '@/lib/upcatch-data'
+import { Check, Flag, MapPin, Navigation, QrCode, MessageCircle, ShieldAlert, Sparkles, X, Zap } from 'lucide-react'
+import { useState } from 'react'
+import { intentById } from '@/lib/upcatch-data'
 import { cn } from '@/lib/utils'
 import { useUpCatch, useVenueLookup } from './app-provider'
-import { BottomSheet, Chip, PersonAvatar, PrimaryButton } from './primitives'
+import { BottomSheet, PersonAvatar, PrimaryButton } from './primitives'
 import { SafetySheet, type SheetKind } from './safety-sheet'
-import { MessageTimestamp } from './message-timestamp'
-
-const QUICK_REPLIES = ['On my way', '2 mins away', 'I’m inside', 'Running late']
-
-const VENUE_IDEAS = [
-  { label: 'Coffee', message: 'Costa or Pret?' },
-  { label: 'Restaurant', message: 'A nearby restaurant?' },
-]
+import { RequestProfile } from './request-profile'
 
 export function LiveMeetup() {
   const { state, actions } = useUpCatch()
   const lookupVenue=useVenueLookup()
   const [sheet, setSheet] = useState<SheetKind | null>(null)
   const [signal, setSignal] = useState(false)
-  const [draft, setDraft] = useState('')
-  const listRef = useRef<HTMLDivElement>(null)
-  const messageInput = useRef<HTMLInputElement>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
   const m = state.meetup
-  const lastMessageId = state.messages[state.messages.length - 1]?.id
-  useEffect(() => {
-    const list = listRef.current
-    if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
-  }, [lastMessageId, m?.person.id])
   if (!m) return null
 
   const venue = lookupVenue(m.venueId)
@@ -41,13 +26,6 @@ export function LiveMeetup() {
   const themEta = Math.max(0, Math.ceil(m.person.walkMin * (1 - state.progress.them)))
   const themKm = Math.max(0, m.person.distanceKm * (1 - state.progress.them))
   const nearlyThere = !arrived && state.progress.me >= 0.9
-
-  const send = (text: string) => {
-    if (!text.trim()) return
-    haptic('tap')
-    actions.sendMessage(text.trim())
-    setDraft('')
-  }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
@@ -91,28 +69,19 @@ export function LiveMeetup() {
           <div className="flex flex-col gap-3 px-4 pt-3">
             {arrived ? (
               <div className="flex items-center gap-3 rounded-3xl bg-muted p-3 animate-in fade-in zoom-in-95">
-                <PersonAvatar photo={m.person.photo} initials={m.person.initials} size={56} ring={partnerHere} />
+                <button type="button" aria-label={`View ${m.person.name} profile`} aria-haspopup="dialog" onClick={() => setProfileOpen(true)} className="press shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-primary"><PersonAvatar photo={m.person.photo} initials={m.person.initials} size={56} ring={partnerHere} /></button>
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-lg font-extrabold">
+                  <button type="button" onClick={() => setProfileOpen(true)} className="press text-left font-display text-lg font-extrabold">
                     {partnerHere ? `${m.person.name} has arrived` : (state.live ? 'Waiting for '+m.person.name+' to arrive' : `${m.person.name} is ~${themEta} min away`)}
-                  </p>
+                  </button>
                   <p className="text-sm text-muted-foreground">{m.person.lookFor}</p>
                 </div>
-                {partnerHere && (
-                  <button
-                    type="button"
-                    onClick={() => actions.openFriends('show', m.person)}
-                    aria-label={`Add ${m.person.name} as a friend with QR`}
-                    className="press grid size-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground"
-                  >
-                    <QrCode className="size-6" aria-hidden="true" />
-                  </button>
-                )}
               </div>
             ) : (
               <div className="flex flex-col gap-3 rounded-3xl bg-muted p-3">
                 <ProgressRow label="You" photo={state.user.photo} initials="ME" value={state.progress.me} eta={state.live ? -1 : meEta} tone="primary" />
                 <ProgressRow
+                  onProfile={() => setProfileOpen(true)}
                   label={m.person.name}
                   photo={m.person.photo}
                   initials={m.person.initials}
@@ -124,7 +93,7 @@ export function LiveMeetup() {
               </div>
             )}
 
-            {state.live ? <p className="rounded-3xl bg-muted p-3 text-sm text-muted-foreground">Say hello below and agree on a public meeting spot together.</p> : <div className="flex items-center gap-3 rounded-3xl border border-border p-2 pr-3">
+            {state.live ? <p className="rounded-3xl bg-muted p-3 text-sm text-muted-foreground">Open Messages to say hello and agree on a public meeting spot together.</p> : <div className="flex items-center gap-3 rounded-3xl border border-border p-2 pr-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={venue.image || '/placeholder.svg'} alt={venue.name} className="size-16 rounded-2xl object-cover" />
               <div className="min-w-0 flex-1">
@@ -159,70 +128,9 @@ export function LiveMeetup() {
               </PrimaryButton>
             )}
 
-            <div className="rounded-3xl bg-muted p-3">
-              <div ref={listRef} className="flex min-h-40 max-h-56 flex-col gap-2 overflow-y-auto lg:max-h-72" aria-live="polite" aria-label="Messages">
-                {state.messages.map((msg) => (
-                  <p
-                    key={msg.id}
-                    className={cn(
-                      'max-w-[80%] rounded-2xl px-3 py-1.5 text-sm animate-in fade-in slide-in-from-bottom-1',
-                      msg.from === 'me' ? 'self-end bg-primary text-primary-foreground' : 'self-start bg-card',
-                    )}
-                  >
-                    <span className="whitespace-pre-wrap break-words">{msg.text}</span>
-                    <MessageTimestamp createdAt={msg.created_at} mine={msg.from === 'me'} />
-                  </p>
-                ))}
-              </div>
-              <div className="mt-3 border-t border-border pt-3">
-                <p className="text-sm font-bold">Venue ideas</p>
-                <p className="mt-1 text-xs text-muted-foreground">Choose a public place together.</p>
-                <p className="mt-2 text-xs font-semibold text-destructive">UpCatch only suggests meeting at a public venue.</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {VENUE_IDEAS.map(idea => (
-                    <Chip key={idea.label} onClick={() => {
-                      setDraft(idea.message)
-                      messageInput.current?.focus()
-                    }}>{idea.label}</Chip>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                {QUICK_REPLIES.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => send(q)}
-                    className="press min-h-10 shrink-0 rounded-full bg-card px-3 text-sm font-semibold"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-              <form
-                className="mt-1 flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  send(draft)
-                }}
-              >
-                <label className="sr-only" htmlFor="uc-msg">
-                  Message {m.person.name}
-                </label>
-                <input
-                  id="uc-msg"
-                  ref={messageInput}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  maxLength={80}
-                  placeholder="Short message…"
-                  className="h-11 min-w-0 flex-1 rounded-full bg-card px-4 text-base outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button type="submit" aria-label="Send" className="press grid size-11 place-items-center rounded-full bg-foreground text-background">
-                  <Send className="size-4" aria-hidden="true" />
-                </button>
-              </form>
-            </div>
+            <PrimaryButton onClick={() => actions.openMessages('live')} className="h-16 w-full text-lg">
+              <MessageCircle className="size-6" aria-hidden="true" /> Msgs {state.messages.length}
+            </PrimaryButton>
 
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -240,10 +148,15 @@ export function LiveMeetup() {
                 <Flag className="size-4" aria-hidden="true" /> Report
               </button>
             </div>
+            <PrimaryButton variant="live" onClick={() => actions.openFriends('show', m.person)} className="min-h-20 w-full justify-between gap-4 px-4 text-left">
+              <span className="text-sm leading-snug">Become friends to stay connected for future UpCatches.</span>
+              <QrCode className="size-8 shrink-0" aria-hidden="true" />
+            </PrimaryButton>
           </div>
         </BottomSheet>
       </div>
 
+      {profileOpen && <RequestProfile person={m.person} live={Boolean(state.live)} returnLabel="Back to meetup" onClose={() => setProfileOpen(false)} />}
       {sheet && (
         <div className="pointer-events-auto">
           <SafetySheet kind={sheet} partnerName={m.person.name} onClose={() => setSheet(null)} />
@@ -261,6 +174,7 @@ function ProgressRow({
   eta,
   tone,
   sub,
+  onProfile,
 }: {
   label: string
   photo: string | null
@@ -268,14 +182,15 @@ function ProgressRow({
   value: number
   eta: number
   tone: 'primary' | 'ink'
+  onProfile?: () => void
   sub?: string
 }) {
   return (
     <div className="flex items-center gap-3">
-      <PersonAvatar photo={photo} initials={initials} size={40} />
+      {onProfile ? <button type="button" onClick={onProfile} aria-label={`View ${label} profile`} aria-haspopup="dialog" className="press shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-primary"><PersonAvatar photo={photo} initials={initials} size={40} /></button> : <PersonAvatar photo={photo} initials={initials} size={40} />}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between">
-          <p className="font-bold">{label}</p>
+          {onProfile ? <button type="button" onClick={onProfile} className="press text-left font-bold">{label}</button> : <p className="font-bold">{label}</p>}
           <p className="font-display text-sm font-extrabold tabular-nums">{value >= 1 ? 'Arrived' : eta<0 ? 'On the way' : `${eta} min`}</p>
         </div>
         <div

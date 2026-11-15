@@ -13,6 +13,7 @@ export function MessagesScreen() {
   const [friendMessages, setFriendMessages] = useState<Message[]>([])
   const [friendError, setFriendError] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
+  const messageInput = useRef<HTMLInputElement>(null)
   const selectedPlan = state.scheduledPlans.find(plan => plan.post_id === state.selectedScheduledPostId) ?? state.scheduledPlan
   const friend = state.friends.find(item => item.person.id === state.friendChatId)
   const target = state.messageTarget === 'live' && state.meetup ? 'live'
@@ -66,8 +67,17 @@ export function MessagesScreen() {
           <MessageTimestamp createdAt={message.created_at} mine={message.from === 'me'} />
         </div>)}
       </div>
+      {target === 'live' && <div className="space-y-2 border-t border-border px-4 py-2">
+        <p className="text-xs text-muted-foreground">Venue ideas · Choose a public place together.</p>
+        <div className="flex gap-2">
+          {[{label:'Coffee',message:'Costa or Pret?'},{label:'Restaurant',message:'A nearby restaurant?'}].map(idea => <button key={idea.label} type="button" onClick={() => { setDraft(idea.message); messageInput.current?.focus() }} className="press min-h-10 rounded-full bg-muted px-3 text-sm font-semibold">{idea.label}</button>)}
+        </div>
+        <div className="flex gap-2 overflow-x-auto">
+          {['On my way', '2 mins away', 'I’m inside', 'Running late'].map(reply => <button key={reply} type="button" onClick={() => actions.sendMessage(reply)} className="press min-h-10 shrink-0 rounded-full bg-card px-3 text-sm font-semibold">{reply}</button>)}
+        </div>
+      </div>}
       <form onSubmit={event => { event.preventDefault(); send() }} className="flex gap-2 border-t border-border bg-card px-4 py-3">
-        <input value={draft} onChange={event => setDraft(event.target.value)} maxLength={80} aria-label={`Message ${partner}`} placeholder="Write a message…" className="h-12 min-w-0 flex-1 rounded-2xl bg-muted px-4 outline-none focus:ring-2 focus:ring-primary" />
+        <input ref={messageInput} value={draft} onChange={event => setDraft(event.target.value)} maxLength={80} aria-label={`Message ${partner}`} placeholder="Write a message…" className="h-12 min-w-0 flex-1 rounded-2xl bg-muted px-4 outline-none focus:ring-2 focus:ring-primary" />
         <button type="submit" disabled={!draft.trim()} aria-label="Send message" className="press grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-50"><Send className="size-5" aria-hidden="true" /></button>
       </form>
       <p className="bg-card px-4 pb-2 text-center text-xs text-muted-foreground">Keep phone numbers and other contact details out of chat.</p>

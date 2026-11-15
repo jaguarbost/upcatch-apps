@@ -9,7 +9,7 @@ const SEEN = 'upcatch:quick-start:v1'
 const HelpContext = createContext<(() => void) | null>(null)
 const STEPS = [
   { icon: Coffee, title: 'Pick your kind of catch-up', text: 'Coffee, dining or drinks? Choose your activity and who you want to meet, then go online.' },
-  { icon: Sparkles, title: 'A little hello comes your way', text: 'We look for someone who fits your choices. Accept if it feels right, or pass and keep looking.' },
+  { icon: Sparkles, title: 'A little hello comes your way', text: 'Discover nearby people first, or browse scheduled meetups across your city. Accept if it feels right, or pass and keep looking.' },
   { icon: MapPin, title: 'Both say yes. Time to meet!', text: 'Use the chat to agree on a public meeting spot. Head over, tap I’m here, and enjoy your catch-up.' },
   { icon: QrCode, title: 'Good chat? Stay connected', text: 'Show your QR code or scan theirs. Once you both confirm, they’re in your friends network.' },
 ]

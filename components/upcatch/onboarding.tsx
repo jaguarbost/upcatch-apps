@@ -321,7 +321,7 @@ export function Onboarding() {
               <span className="relative grid size-16 place-items-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/40">
                 <MapPin className="size-7" aria-hidden="true" />
               </span>
-              <span className="absolute bottom-2 rounded-full bg-card px-3 py-1 text-xs font-bold shadow-sm">~300 m fuzzy zone</span>
+              <span className="absolute bottom-2 rounded-full bg-card px-3 py-1 text-xs font-bold shadow-sm">Approximate nearby area</span>
             </div>
           </StepShell>
         )}

@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: 'Can people see where I am?',
-    a: 'Never exactly. Others only see a rough ~300 m area while you are free. The only precise place anyone sees is the public venue you both agree on.',
+    a: 'Never exactly. Others only see an approximate nearby area while you are free. The only precise place anyone sees is the public venue you both agree on.',
   },
   {
     q: 'What if I change my mind?',

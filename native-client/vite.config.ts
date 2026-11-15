@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
     resolve: { alias: [
       { find: '@/lib/supabase/client', replacement: native('supabase-client.ts') },
       { find: '@/app/onboarding/actions', replacement: native('onboarding-actions.ts') },
+      { find: '@/components/account/photo-upload', replacement: native('profile-photo-upload.tsx') },
       { find: '@/components/account/install-app', replacement: native('install-app.tsx') },
       { find: '@/components/account/location-help', replacement: native('location-help.tsx') },
       { find: 'next/link', replacement: native('link.tsx') },
