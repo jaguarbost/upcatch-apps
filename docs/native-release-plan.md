@@ -6,6 +6,12 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## iOS upload correction — build 8 — 2026-11-15
+
+- Added `NSLocationAlwaysAndWhenInUseUsageDescription` required by the installed Capacitor geolocation plugin, using the same nearby-member purpose as the existing When In Use description. Location requests and background modes are unchanged; background location is not enabled.
+- Increased iOS build number and the aligned Android versionCode from 7 to 8 for the next upload; marketing version remains 2.0.2. Previously generated Android build 7 artifacts below are historical and have not been rebuilt for this correction.
+- Local `pnpm native:check`, `pnpm native:release-check` and Info.plist XML parsing passed. The metadata check now requires both location purpose strings. Codemagic archive, Apple upload acceptance and device permission prompts remain unverified. Milestone completion remains 25% (3/12).
+
 ## Android signed release build 7 — 2026-11-15
 
 - Source was pushed to Capacitor `main` first (`c136253`, then iOS URL-routing follow-up `226f777`). No web-repository push, website deployment, production database mutation or store upload was performed for this release.

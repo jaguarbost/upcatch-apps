@@ -10,6 +10,8 @@
 	<string>en</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>UpCatch uses your approximate area to show nearby members and match you within your chosen distance.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>UpCatch uses your approximate area to show nearby members and match you within your chosen distance.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>UpCatch uses your camera when you choose to take a profile photo or scan a friend's code.</string>
 	<key>UIBackgroundModes</key>

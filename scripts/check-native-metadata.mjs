@@ -6,6 +6,10 @@ const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8')
 const packageJson = JSON.parse(await read('package.json'))
 const gradle = await read('android/app/build.gradle')
 const xcode = await read('ios/App/App.xcodeproj/project.pbxproj')
+const plist = await read('ios/App/App/Info.plist')
+for (const key of ['NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription']) {
+  assert.match(plist, new RegExp(`<key>${key}</key>\\s*<string>[^<\\s][^<]*</string>`), `Missing iOS location purpose string: ${key}`)
+}
 const androidVersion = gradle.match(/\bversionName\s+"([^"]+)"/)?.[1]
 const androidBuild = Number(gradle.match(/\bversionCode\s+(\d+)/)?.[1])
 const iosVersions = [...xcode.matchAll(/\bMARKETING_VERSION = ([^;]+);/g)].map(match => match[1])
