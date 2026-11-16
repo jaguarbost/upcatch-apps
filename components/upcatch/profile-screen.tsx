@@ -77,6 +77,7 @@ export function ProfileScreen() {
             {!state.live && <Pill icon={<BadgeCheck className="size-3.5" />} label="Phone" />}
           </div>
         </div>
+        {state.user.bio && <p className="max-w-sm whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{state.user.bio}</p>}
       </header>
 
       {state.live && <details className="mx-4 mt-4 rounded-3xl bg-card p-4">
@@ -88,6 +89,54 @@ export function ProfileScreen() {
         <Stat value={String(state.live ? state.profileStats.completed_meetups : state.history.length + 5)} label="UpCatches" />
         <Stat value={state.live ? (state.profileStats.rating===null?'—':state.profileStats.rating.toFixed(1)) : '4.9'} label="Rating" />
         <Stat value={state.live ? (state.profileStats.show_up_percent===null?'—':state.profileStats.show_up_percent+'%') : '98%'} label="Show-up" />
+      </section>
+
+      <section className="mx-4 mt-3 flex flex-col gap-3 rounded-3xl bg-card p-4" aria-labelledby="friends-h">
+        <div className="flex items-center justify-between">
+          <h2 id="friends-h" className="flex items-center gap-2 font-display text-lg font-extrabold">
+            <Users className="size-5 text-primary" aria-hidden="true" /> Friends
+            <span className="rounded-full bg-muted px-2 text-sm">{state.friends.length}</span>
+          </h2>
+          <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+            <Globe2 className="size-3.5" aria-hidden="true" /> Any distance
+          </span>
+        </div>
+        <button type="button" onClick={() => actions.setTab('nudges')} className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground"><Send className="size-4" aria-hidden="true" /> Nudge friends</button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => actions.openFriends('show')}
+            className="press flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-primary font-display font-bold text-primary-foreground shadow-lg shadow-primary/30"
+          >
+            <QrCode className="size-5" aria-hidden="true" /> My code
+          </button>
+          <button
+            type="button"
+            onClick={() => actions.openFriends('scan')}
+            className="press flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-live font-display font-bold text-live-foreground"
+          >
+            <ScanLine className="size-5" aria-hidden="true" /> Scan
+          </button>
+        </div>
+        {state.friends.length === 0 ? (
+          <p className="rounded-2xl bg-muted p-4 text-center text-sm leading-relaxed text-muted-foreground">
+            No friends yet. After a great UpCatch, swap QR codes to stay connected.
+          </p>
+        ) : (
+          <ul className="flex flex-col">
+            {state.friends.map((f) => (
+              <li key={f.person.id} className="flex min-h-16 items-center gap-3 py-1.5">
+                <PersonAvatar photo={f.person.photo} initials={f.person.initials} size={44} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{f.person.name}</p>
+                  <p className="truncate text-sm text-muted-foreground">{f.where}</p>
+                </div>
+                <FriendStatusPill status={f.status} />
+                <button type="button" onClick={()=>setRemoveTarget({id:f.person.id,name:f.person.name})} className="press min-h-10 rounded-xl px-2 text-xs font-bold text-destructive" aria-label={'Remove '+f.person.name+' from friends'}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="mt-5 flex flex-col gap-3" aria-labelledby="badges-h">
@@ -146,54 +195,6 @@ export function ProfileScreen() {
         <NotificationHelp />
         <InstallAppCard />
       </section>}
-      <section className="mx-4 mt-3 flex flex-col gap-3 rounded-3xl bg-card p-4" aria-labelledby="friends-h">
-        <div className="flex items-center justify-between">
-          <h2 id="friends-h" className="flex items-center gap-2 font-display text-lg font-extrabold">
-            <Users className="size-5 text-primary" aria-hidden="true" /> Friends
-            <span className="rounded-full bg-muted px-2 text-sm">{state.friends.length}</span>
-          </h2>
-          <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-            <Globe2 className="size-3.5" aria-hidden="true" /> Any distance
-          </span>
-        </div>
-        <button type="button" onClick={() => actions.setTab('nudges')} className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground"><Send className="size-4" aria-hidden="true" /> Nudge friends</button>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => actions.openFriends('show')}
-            className="press flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-primary font-display font-bold text-primary-foreground shadow-lg shadow-primary/30"
-          >
-            <QrCode className="size-5" aria-hidden="true" /> My code
-          </button>
-          <button
-            type="button"
-            onClick={() => actions.openFriends('scan')}
-            className="press flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-live font-display font-bold text-live-foreground"
-          >
-            <ScanLine className="size-5" aria-hidden="true" /> Scan
-          </button>
-        </div>
-        {state.friends.length === 0 ? (
-          <p className="rounded-2xl bg-muted p-4 text-center text-sm leading-relaxed text-muted-foreground">
-            No friends yet. After a great UpCatch, swap QR codes to stay connected.
-          </p>
-        ) : (
-          <ul className="flex flex-col">
-            {state.friends.map((f) => (
-              <li key={f.person.id} className="flex min-h-16 items-center gap-3 py-1.5">
-                <PersonAvatar photo={f.person.photo} initials={f.person.initials} size={44} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{f.person.name}</p>
-                  <p className="truncate text-sm text-muted-foreground">{f.where}</p>
-                </div>
-                <FriendStatusPill status={f.status} />
-                <button type="button" onClick={()=>setRemoveTarget({id:f.person.id,name:f.person.name})} className="press min-h-10 rounded-xl px-2 text-xs font-bold text-destructive" aria-label={'Remove '+f.person.name+' from friends'}>Remove</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
       <section className="mx-4 mt-3 flex flex-col rounded-3xl bg-card p-2" aria-labelledby="friend-alerts-h">
         <h2 id="friend-alerts-h" className="flex items-center gap-2 px-2 pt-2 pb-1 font-display text-lg font-extrabold">
           <Bell className="size-5 text-primary" aria-hidden="true" /> Friend alerts

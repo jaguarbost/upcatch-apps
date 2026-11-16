@@ -8,6 +8,8 @@ async function fixture(path, imports = {}) {
   let cursor = 0
   const slots = [], pending = []
   const react = {
+    createContext: () => ({ Provider: 'ContextProvider' }),
+    useMemo: fn => fn(),
     useState(initial) {
       const index = cursor++
       if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial
@@ -61,6 +63,167 @@ function text(tree) {
 const person = { id: 'other-member', name: 'Sam', photo: '/api/member-photo?meetup=real', initials: 'SA', interests: ['Coffee'], walkMin: 2, distanceKm: 1 }
 const venue = { walkMin: 2, name: 'Cafe', address: 'Public street' }
 const data = { intentById: () => ({ label: 'Coffee', icon: 'Coffee' }), clockIn: () => '12:00', sharedInterests: () => [] }
+
+async function onboardingFixture(live, transport = {}) {
+  const shared = { INTERESTS: ['Coffee', 'Books', 'Music', 'Design'] }
+  const flow = {}
+  new Function('require', 'exports', ts.transpileModule(await readFile('lib/onboarding-flow.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(() => shared, flow)
+  return fixture('components/upcatch/onboarding.tsx', {
+    './app-provider': { useUpCatch: () => ({ state: { live }, actions: {} }) },
+    'next/link': { default: 'Link' }, '@/components/account/onboarding-permissions': { OnboardingPermissions: 'OnboardingPermissions' },
+    '@/app/onboarding/actions': { saveDetails: async () => ({ message: 'Saved' }) },
+    '@/lib/onboarding-flow': flow, '@/lib/onboarding-transport': transport,
+    '@/lib/prepare-profile-photo': { prepareProfilePhoto: async file => file }, '@/lib/haptics': { haptic() {} },
+    '@/lib/upcatch-data': shared, './brand-badge': { LogoMark: 'LogoMark' }, './landing-story': { LandingStory: 'LandingStory' },
+  })
+}
+
+test('photo failure preserves selected file; success advances to step four and bio retries never repeat photo upload', async t => {
+  const previousWindow = global.window
+  const redirects = [], uploaded = [], introductions = []
+  global.window = { location: { assign: path => redirects.push(path) } }
+  t.after(() => { global.window = previousWindow })
+  const live = { memberId: 'member-a', name: 'Sam', detailsSaved: true, photoSaved: false, aboutPending: false }
+  const view = await onboardingFixture(live, {
+    saveOnboardingPhoto: async file => { uploaded.push(file); if (uploaded.length === 1) throw Error('Network lost'); return { photoSaved: true, nextStep: 'about' } },
+    saveOnboardingAbout: async (bio, interests) => { introductions.push({ bio, interests }); if (introductions.length === 1) throw Error('Please retry your introduction') },
+  })
+  let tree = view.render('Onboarding')
+  nodes(tree).find(node => node.type === 'OnboardingPermissions').props.onLocation()
+  tree = view.render('Onboarding')
+  const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
+  nodes(tree).find(node => node.type === 'input' && node.props.type === 'file').props.onChange({ target: { files: [file], value: 'photo.jpg' } })
+  await new Promise(setImmediate)
+  tree = view.render('Onboarding'); tree = view.render('Onboarding')
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  tree = view.render('Onboarding')
+  assert.ok(text(tree).includes('Network lost'))
+  assert.equal(nodes(tree).find(node => node.type === 'PrimaryButton').props.disabled, false)
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  tree = view.render('Onboarding')
+  assert.equal(nodes(tree).find(node => node.props?.role === 'progressbar').props['aria-valuenow'], 4)
+  assert.equal(nodes(tree).find(node => node.props?.role === 'progressbar').props['aria-valuemax'], 4)
+  assert.deepEqual(uploaded, [file, file])
+  assert.deepEqual(redirects, [])
+  nodes(tree).find(node => node.type === 'textarea').props.onChange({ target: { value: '  A little about Sam  ' } })
+  for (const interest of ['Coffee', 'Books', 'Music']) nodes(tree).find(node => node.type === 'Chip' && text(node) === interest).props.onClick()
+  tree = view.render('Onboarding')
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  tree = view.render('Onboarding')
+  assert.ok(text(tree).includes('Please retry your introduction'))
+  assert.equal(nodes(tree).find(node => node.type === 'textarea').props.value, '  A little about Sam  ')
+  assert.equal(nodes(tree).filter(node => node.type === 'Chip' && node.props.active).length, 3)
+  assert.equal(uploaded.length, 2)
+  assert.deepEqual(redirects, [])
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  assert.deepEqual(introductions, [0, 1].map(() => ({ bio: 'A little about Sam', interests: ['Coffee', 'Books', 'Music'] })))
+  assert.deepEqual(redirects, ['/'])
+  assert.equal(uploaded.length, 2)
+  view.close()
+})
+
+test('a relaunch with saved photo and pending introduction resumes step four with persisted fields', async () => {
+  const view = await onboardingFixture({ memberId: 'member-a', detailsSaved: true, photoSaved: true, aboutPending: true, bio: 'Saved draft', interests: ['Coffee', 'Books', 'Music'] })
+  const tree = view.render('Onboarding')
+  assert.equal(nodes(tree).find(node => node.props?.role === 'progressbar').props['aria-valuenow'], 4)
+  assert.equal(nodes(tree).find(node => node.type === 'textarea').props.value, 'Saved draft')
+  assert.equal(nodes(tree).filter(node => node.type === 'Chip' && node.props.active).length, 3)
+  assert.equal(nodes(tree).some(node => node.type === 'OnboardingPermissions'), false)
+  view.close()
+})
+
+test('denied location stays on the permission step and allows retry without false progress', async () => {
+  class LocationError extends Error { status = 'denied' }
+  let attempts = 0, continued = 0
+  const view = await fixture('components/account/onboarding-permissions.tsx', {
+    '@/components/upcatch/primitives': { PrimaryButton: 'PrimaryButton' },
+    '@/lib/browser-location': { LocationError, saveBrowserLocation: async () => { if (++attempts === 1) throw new LocationError('Location denied') } },
+    '@/lib/browser-permissions': { observeLocationPermission: () => () => {} },
+    './location-help': { LocationHelp: 'LocationHelp' }, './install-app': { InstallAppCard: 'InstallAppCard' },
+  })
+  let tree = view.render('OnboardingPermissions', { onLocation: () => continued++ })
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  tree = view.render('OnboardingPermissions', { onLocation: () => continued++ })
+  assert.equal(continued, 0)
+  assert.ok(text(tree).includes('Location denied'))
+  assert.equal(nodes(tree).find(node => node.type === 'PrimaryButton').props.disabled, false)
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  assert.equal(continued, 1)
+  view.close()
+})
+
+test('image-only walkthrough navigates the three supplied screenshots and has no added visible copy', async () => {
+  let closed = 0
+  const view = await fixture('components/upcatch/quick-start-slides.tsx')
+  const props = { onClose: () => closed++, onHelp() {} }
+  let tree = view.render('QuickStartSlides', props)
+  assert.equal(text(tree), '')
+  assert.equal(nodes(tree).find(node => node.type === 'img').props.src, '/onboarding/how-it-works-1.webp')
+  assert.equal(nodes(tree).find(node => node.props?.['aria-label'] === 'Previous step').props.disabled, true)
+  nodes(tree).find(node => node.props?.['aria-label'] === 'Next step').props.onClick()
+  tree = view.render('QuickStartSlides', props)
+  assert.equal(nodes(tree).find(node => node.type === 'img').props.src, '/onboarding/how-it-works-2.webp')
+  nodes(tree).find(node => node.props?.['aria-label'] === 'Go to step 3').props.onClick()
+  tree = view.render('QuickStartSlides', props)
+  assert.equal(nodes(tree).find(node => node.type === 'img').props.src, '/onboarding/how-it-works-3.webp')
+  nodes(tree).find(node => node.props?.['aria-label'] === 'Finish how it works').props.onClick()
+  assert.equal(closed, 1)
+  view.close()
+})
+
+test('walkthrough waits for onboarding, preserves its seen choice and yields to active meetup requests', async t => {
+  const previousStorage = global.localStorage, previousDocument = global.document
+  const values = new Map()
+  global.localStorage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) }
+  global.document = { activeElement: null }
+  t.after(() => { global.localStorage = previousStorage; global.document = previousDocument })
+  const state = { live: {}, onboarded: false, phase: 'idle' }
+  const view = await fixture('components/upcatch/how-it-works.tsx', {
+    './app-provider': { useUpCatch: () => ({ state }) }, './quick-start-slides': { QuickStartSlides: 'QuickStartSlides' },
+  })
+  assert.equal(nodes(view.render('HowItWorksProvider', {})).some(node => node.type === 'QuickStartSlides'), false)
+  state.onboarded = true
+  view.render('HowItWorksProvider', {})
+  let tree = view.render('HowItWorksProvider', {})
+  assert.ok(nodes(tree).some(node => node.type === 'QuickStartSlides'))
+  state.phase = 'incoming'
+  view.render('HowItWorksProvider', {})
+  tree = view.render('HowItWorksProvider', {})
+  assert.equal(nodes(tree).some(node => node.type === 'QuickStartSlides'), false)
+  state.phase = 'idle'
+  view.render('HowItWorksProvider', {})
+  tree = view.render('HowItWorksProvider', {})
+  nodes(tree).find(node => node.type === 'QuickStartSlides').props.onClose()
+  assert.equal(values.get('upcatch:quick-start:v1'), '1')
+  assert.equal(nodes(view.render('HowItWorksProvider', {})).some(node => node.type === 'QuickStartSlides'), false)
+  view.close()
+})
+
+test('onboarding exits the photo flow when refreshed bootstrap confirms completion without remounting', async t => {
+  const previousWindow = global.window, previousDocument = global.document
+  global.window = { location: { pathname: '/onboarding', search: '' }, setTimeout, clearTimeout }
+  global.document = { visibilityState: 'hidden' }
+  t.after(() => { global.window = previousWindow; global.document = previousDocument })
+  const sharedData = {}
+  const compiledData = ts.transpileModule(await readFile('lib/upcatch-data.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  new Function('require', 'exports', compiledData)(() => new Proxy({}, { get: (_, name) => String(name) }), sharedData)
+  const view = await fixture('components/upcatch/app-provider.tsx', {
+    '@/lib/upcatch-data': sharedData,
+    '@/lib/supabase/client': { createClient: () => ({ auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } }) },
+    '@/lib/push-client': {},
+    '@/lib/browser-location': {},
+    '@/lib/browser-permissions': { observeLocationPermission: () => () => {} },
+    '@/lib/haptics': { haptic() {} },
+  })
+  let initial = { memberId: 'member-a', name: 'Sam', completed: false, photo: null, venues: [], center: [0, 0] }
+  assert.equal(view.render('UpCatchProvider', { initial }).props.value.state.onboarded, false)
+  initial = { ...initial, completed: true, photo: 'https://private.example/new-signed-photo' }
+  view.render('UpCatchProvider', { initial })
+  const state = view.render('UpCatchProvider', { initial }).props.value.state
+  assert.equal(state.onboarded, true)
+  assert.equal(state.user.photo, initial.photo)
+  view.close()
+})
 
 test('meetup button opens its live conversation using loaded count and keeps QR friendship flow', async () => {
   const calls = []

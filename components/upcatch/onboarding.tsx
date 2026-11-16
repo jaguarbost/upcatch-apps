@@ -4,7 +4,9 @@ import { Camera, Check, ChevronDown, ChevronLeft, MapPin, ScanFace, ShieldCheck,
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { OnboardingPermissions } from '@/components/account/onboarding-permissions'
-import { saveDetails, uploadPhoto } from '@/app/onboarding/actions'
+import { saveDetails } from '@/app/onboarding/actions'
+import { initialOnboardingStep, LIVE_ONBOARDING_STEPS, validateOnboardingAbout } from '@/lib/onboarding-flow'
+import { saveOnboardingPhoto, saveOnboardingAbout } from '@/lib/onboarding-transport'
 import { prepareProfilePhoto } from '@/lib/prepare-profile-photo'
 import { haptic } from '@/lib/haptics'
 import { INTERESTS, PEOPLE } from '@/lib/upcatch-data'
@@ -19,14 +21,16 @@ const STEPS = ['welcome', 'name', 'photo', 'interests', 'verify', 'location'] as
 export function Onboarding() {
   const { state, actions } = useUpCatch()
   const live = state.live
-  const [step, setStep] = useState(live ? (live.detailsSaved ? 2 : 1) : 0)
+  const [step, setStep] = useState(initialOnboardingStep(live))
   const [name, setName] = useState(live?.name ?? '')
   const [birthMonth,setBirthMonth]=useState('')
   const [birthYear,setBirthYear]=useState('')
   const age = birthMonth && birthYear ? new Date().getFullYear()-Number(birthYear)-(new Date().getMonth()+1<=Number(birthMonth)?1:0) : 0
-  const [photo, setPhoto] = useState<string | null>(null)
+  const [photo, setPhoto] = useState<string | null>(live?.photo ?? null)
+  const [photoSaved, setPhotoSaved] = useState(Boolean(live?.photoSaved))
+  const [bio, setBio] = useState(live?.bio ?? '')
   const [photoLoading, setPhotoLoading] = useState(false)
-  const [interests, setInterests] = useState<string[]>(['Coffee', 'Design'])
+  const [interests, setInterests] = useState<string[]>(live ? live.interests ?? [] : ['Coffee', 'Design'])
   const [verify, setVerify] = useState<'idle' | 'scanning' | 'done'>('idle')
   const [locating, setLocating] = useState(false)
 
@@ -43,7 +47,7 @@ export function Onboarding() {
     setSaveError('');setPhotoLoading(true)
     try{
       const prepared=await prepareProfilePhoto(file)
-      if(selection===photoSelection.current)setPhotoFile(prepared)
+      if(selection===photoSelection.current){setPhotoFile(prepared);setPhotoSaved(false)}
     }catch(error){if(selection===photoSelection.current)setSaveError(error instanceof Error?error.message:'This photo could not be prepared. Please choose another.')}
     finally{if(selection===photoSelection.current)setPhotoLoading(false)}
   }
@@ -52,7 +56,11 @@ export function Onboarding() {
     const url=URL.createObjectURL(photoFile);setPhoto(url)
     return()=>URL.revokeObjectURL(url)
   },[photoFile])
-  const current = live ? (['welcome','name','permissions','photo'] as const)[step] : STEPS[step]
+  useEffect(() => {
+    if (live?.photoSaved && live.aboutPending && !savingRef.current) { setPhotoSaved(true); setStep(4) }
+  }, [live?.photoSaved, live?.aboutPending])
+  const current = live ? LIVE_ONBOARDING_STEPS[step] : STEPS[step]
+  const refreshAccount = () => window.location.assign('/')
   const next = async () => {
     if(live){
       if(savingRef.current||photoLoading)return
@@ -66,20 +74,27 @@ export function Onboarding() {
           if(result?.error){setSaveError(result.error);return}
           setStep(2)
 
-        }else if(step===3&&photoFile){
-          form.set('photo',photoFile)
-          const result=await uploadPhoto({},form)
-          if(result?.error)setSaveError(result.error)
-          else if(result?.message)window.location.assign('/')
+        }else if(step===3){
+          if(photoSaved){setStep(4);return}
+          if(!photoFile){setSaveError('Choose a photo to continue.');return}
+          const result=await saveOnboardingPhoto(photoFile)
+          setPhotoSaved(true)
+          if(result.nextStep==='about')setStep(4)
+          else refreshAccount()
+        }else if(step===4){
+          const values=validateOnboardingAbout(bio,interests)
+          if('error' in values){setSaveError(values.error);return}
+          await saveOnboardingAbout(values.bio,values.interests)
+          refreshAccount()
         }
-      }catch{setSaveError(step===3?'We could not confirm the photo was saved. Your selected photo is still here; please retry.':'Your details could not be saved. Please retry.')}finally{savingRef.current=false;setSaving(false)}
+      }catch(error){setSaveError(error instanceof Error?error.message:step===3?'We could not confirm the photo was saved. Your selected photo is still here; please retry.':step===4?'Your introduction could not be saved. Your photo is saved; please retry this step.':'Your details could not be saved. Please retry.')}finally{savingRef.current=false;setSaving(false)}
       return
     }
     if(step===1&&(!birthMonth||!birthYear||age<18)){actions.showToast('UpCatch is for people aged 18 and over. Enter your birth month and year.');return}
     haptic('tap')
     setStep((s) => Math.min(STEPS.length - 1, s + 1))
   }
-  const back = () => {if(saving||photoLoading)return;setSaveError('');setStep((s) => Math.max(live ? (live.detailsSaved?2:1) : 0, s - 1))}
+  const back = () => {if(saving||photoLoading)return;setSaveError('');setStep((s) => Math.max(live ? (photoSaved?4:live.detailsSaved?2:1) : 0, s - 1))}
 
   const finish = () => {
     setLocating(true)
@@ -174,28 +189,29 @@ export function Onboarding() {
   }
 
   return (
-    <main className="mx-auto flex h-full w-full max-w-lg flex-col bg-background lg:py-6">
-      <header className="flex items-center gap-3 px-4 pt-4">
+    <main className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background lg:py-6">
+      <header className="flex shrink-0 items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
         <button
           type="button"
           onClick={back}
           aria-label="Back"
+          disabled={Boolean(live && photoSaved) || saving || photoLoading}
           className="press grid size-11 place-items-center rounded-full bg-card shadow-sm"
         >
           <ChevronLeft className="size-5" aria-hidden="true" />
         </button>
-        <div className="flex flex-1 gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={live ? 3 : 5} aria-valuenow={step}>
-          {(live ? ['name','permissions','photo'] : STEPS.slice(1)).map((s, i) => (
+        <div className="flex flex-1 gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={live ? 4 : 5} aria-valuenow={step}>
+          {(live ? LIVE_ONBOARDING_STEPS.slice(1) : STEPS.slice(1)).map((s, i) => (
             <span
               key={s}
               className={cn('h-1.5 flex-1 rounded-full transition-colors duration-300', i < step ? 'bg-primary' : 'bg-muted')}
             />
           ))}
         </div>
-        <span className="w-11 text-right text-sm font-semibold text-muted-foreground tabular-nums">{step}/{live ? 3 : 5}</span>
+        <span className="w-11 text-right text-sm font-semibold text-muted-foreground tabular-nums">{step}/{live ? 4 : 5}</span>
       </header>
 
-      <div key={current} className="flex flex-1 flex-col overflow-y-auto px-6 pt-8 animate-in fade-in slide-in-from-right-6 duration-300">
+      <div key={current} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pt-8 pb-4 animate-in fade-in slide-in-from-right-6 duration-300">
         {current === 'name' && (
           <StepShell title="First, what should people call you?" hint="Only your first name and initials are shown.">
             <label className="flex flex-col gap-2">
@@ -268,14 +284,19 @@ export function Onboarding() {
           </StepShell>
         )}
 
-        {current === 'interests' && (
-          <StepShell title="What are you into?" hint="Pick 3 or more. We use these to suggest great matches.">
+        {(current === 'interests' || current === 'about') && (
+          <StepShell title={live ? 'A little about you' : 'What are you into?'} hint={live ? 'Your photo is saved. Add a short bio and pick 3 or more interests.' : 'Pick 3 or more interests. We use these to suggest great matches.'}>
+            {live && <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold">Bio</span>
+              <textarea value={bio} onChange={event => setBio(event.target.value)} disabled={saving} maxLength={1000} rows={3} aria-describedby="onboarding-bio-length" placeholder="Tell people a little about yourself…" className="min-h-28 w-full resize-y rounded-2xl border border-border bg-card p-4 text-base outline-none focus:ring-2 focus:ring-primary" />
+              <span id="onboarding-bio-length" className="text-xs text-muted-foreground">{Array.from(bio.trim()).length}/500 characters</span>
+            </label>}
             <div className="flex flex-wrap gap-2">
               {INTERESTS.map((i) => (
                 <Chip
                   key={i}
                   active={interests.includes(i)}
-                  onClick={() => setInterests((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]))}
+                  onClick={() => { if (!saving) setInterests((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i])) }}
                 >
                   {interests.includes(i) && <Check className="size-4" aria-hidden="true" />}
                   {i}
@@ -327,7 +348,7 @@ export function Onboarding() {
         )}
       </div>
 
-      <footer className="flex flex-col gap-3 px-6 pt-4 pb-8">
+      <footer className="flex shrink-0 flex-col gap-3 px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
         {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
         {current === 'name' && (
           <PrimaryButton onClick={next} disabled={!name.trim() || saving} className="w-full">
@@ -336,9 +357,10 @@ export function Onboarding() {
         )}
         {current === 'photo' && (
           <PrimaryButton onClick={next} disabled={!photo || saving || photoLoading} className="w-full">
-            {saving?'Saving your photo?':photoLoading?'Preparing your photo?':live?'Save photo and finish':'Continue'}
+            {saving?'Saving your photo…':photoLoading?'Preparing your photo…':'Continue'}
           </PrimaryButton>
         )}
+        {current === 'about' && <PrimaryButton onClick={next} disabled={saving || 'error' in validateOnboardingAbout(bio,interests)} className="w-full">{saving?'Saving your introduction…':'Save and finish'}</PrimaryButton>}
         {current === 'interests' && (
           <PrimaryButton onClick={next} disabled={interests.length < 3} className="w-full">
             {interests.length < 3 ? `Pick ${3 - interests.length} more` : 'Continue'}

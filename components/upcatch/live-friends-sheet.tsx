@@ -173,7 +173,7 @@ function Tab({ active, onClick, icon, children }: { active: boolean; onClick: ()
 }
 
 function Scanner({ onCode }: { onCode: (value: string) => Promise<boolean> }) {
-  const { video, error, requested, retry } = useQrCamera(onCode)
+  const { video, error, requested, retry, settingsAvailable, openSettings } = useQrCamera(onCode)
   return <div className="flex flex-1 flex-col gap-4">
     <div className="relative aspect-square w-full overflow-hidden rounded-[2rem] bg-foreground">
       <video ref={video} autoPlay muted playsInline aria-label="Camera preview for scanning an UpCatch friend code" className="absolute inset-0 size-full object-cover" />
@@ -182,7 +182,7 @@ function Scanner({ onCode }: { onCode: (value: string) => Promise<boolean> }) {
     </div>
     <p className="text-center text-sm leading-relaxed text-muted-foreground text-pretty">Point at someone’s UpCatch code. You can add friends without a meetup.</p>
     {!requested && <PrimaryButton className="w-full" onClick={retry}><ScanLine className="size-5" aria-hidden="true" />Allow camera</PrimaryButton>}
-    {error && <><p className="text-center text-sm text-muted-foreground" role="alert">{error}</p><PrimaryButton className="w-full" onClick={retry}>Retry camera</PrimaryButton></>}
+    {error && <><p className="text-center text-sm text-muted-foreground" role="alert">{error}</p><PrimaryButton className="w-full" onClick={settingsAvailable ? openSettings : retry}>{settingsAvailable ? 'Open Settings' : 'Retry camera'}</PrimaryButton></>}
   </div>
 }
 

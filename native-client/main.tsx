@@ -15,6 +15,7 @@ import { nativePublicConfig } from './config'
 import { installNativeApiBridge, installPrivateImageBridge } from './api-bridge'
 import { setNativeSupabaseClient } from './supabase-client'
 import { setNativeRuntime } from './runtime-store'
+import { loadNativeMember } from './load-member'
 import {
   AcceptTermsScreen, CheckEmailScreen, ConfirmScreen, ForgotScreen, LoginScreen,
   PrivacyRequestsScreen, PrivacyScreen, ResetScreen, SignUpScreen,
@@ -58,6 +59,7 @@ function NativeClient() {
   const [epoch, setEpoch] = useState(0)
   const renderedMember = useRef<string | null>(null)
   const pendingAppPath = useRef<string | null>(null)
+  const memberLoad = useRef(0)
 
   useEffect(() => {
     const update = () => setPath(window.location.pathname)
@@ -67,12 +69,14 @@ function NativeClient() {
   }, [])
 
   const loadMember = useCallback(async (active: Runtime) => {
-    const member = await active.session.restore()
-    if (!member) { renderedMember.current = null; setBootstrap(null); setRestoreFailed(false); navigate('/auth/login', true); return }
-    const { data: { user }, error: userError } = await active.supabase.auth.getUser()
-    if (userError || !user) throw new Error('Your sign-in could not be checked. Please retry.')
-    if (!user.user_metadata?.terms_version) { setBootstrap(null); setRestoreFailed(false); navigate('/auth/accept-terms', true); return }
-    const initial = await active.api.bootstrap()
+    const request = ++memberLoad.current
+    let result: Awaited<ReturnType<typeof loadNativeMember>>
+    try { result = await loadNativeMember(active) }
+    catch (error) { if (request === memberLoad.current) throw error; return }
+    if (request !== memberLoad.current) return
+    if (result.kind === 'anonymous') { renderedMember.current = null; setBootstrap(null); setRestoreFailed(false); navigate('/auth/login', true); return }
+    if (result.kind === 'terms') { setBootstrap(null); setRestoreFailed(false); navigate('/auth/accept-terms', true); return }
+    const initial = result.initial
     setNotice('')
     setRestoreFailed(false)
     setBootstrap(initial)

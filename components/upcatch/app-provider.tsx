@@ -24,6 +24,7 @@ export interface UserProfile {
   name: string
   age: number
   photo: string | null
+  bio?: string
   interests: string[]
 }
 
@@ -124,10 +125,13 @@ const AUTO_REPLIES = ['Perfect, see you soon!', 'Nice — nearly there.', 'Sound
 
 function useUpCatchState(initial?: LiveBootstrap) {
   const [onboarded, setOnboarded] = useState(initial?.completed ?? false)
-  const [user, setUser] = useState<UserProfile>(initial ? { name: initial.name, age: 0, photo: initial.photo, interests: [] } : { name: 'Alex', age: 29, photo: '/people/alex.png', interests: ['Coffee', 'Design', 'Startups', 'Running'] })
   useEffect(() => {
-    if (initial) setUser(current => ({ ...current, photo: initial.photo }))
-  }, [initial?.photo])
+    if (initial) setOnboarded(initial.completed)
+  }, [initial?.completed])
+  const [user, setUser] = useState<UserProfile>(initial ? { name: initial.name, age: 0, photo: initial.photo, bio: initial.bio ?? '', interests: initial.interests ?? [] } : { name: 'Alex', age: 29, photo: '/people/alex.png', interests: ['Coffee', 'Design', 'Startups', 'Running'] })
+  useEffect(() => {
+    if (initial) setUser(current => ({ ...current, photo: initial.photo, ...(initial.bio !== undefined ? { bio: initial.bio } : {}), ...(initial.interests ? { interests: initial.interests } : {}) }))
+  }, [initial?.photo, initial?.bio, initial?.interests])
   const [tab, setTab] = useState<Tab>('map')
   const [phase, setPhase] = useState<Phase>('idle')
   const [freeForMin, setFreeForMin] = useState(60)

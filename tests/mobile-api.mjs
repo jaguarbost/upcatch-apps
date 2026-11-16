@@ -12,6 +12,40 @@ new Function('require', 'exports', js)(name => { throw Error(`Unexpected import:
 
 function session(id, token) { return { user: { id }, access_token: token } }
 
+test('stalled mobile requests abort at a deadline and can be retried', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
+  let signal, calls = 0
+  const client = new api.MobileApi('https://api.example', auth, async (_, init) => {
+    if (++calls > 1) return Response.json({ memberId: 'member-a' })
+    signal = init.signal
+    return new Promise(() => {})
+  })
+  const failed = assert.rejects(client.bootstrap(), error => error.status === 0 && /too long/.test(error.message))
+  await new Promise(setImmediate)
+  t.mock.timers.tick(15000)
+  await failed
+  assert.equal(signal.aborted, true)
+  assert.equal((await client.session()).memberId, 'member-a')
+})
+
+test('photo uploads get a longer deadline and explain that a timed-out upload may already be saved', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
+  let signal
+  const client = new api.MobileApi('https://api.example', auth, async (_, init) => {
+    signal = init.signal
+    return new Promise(() => {})
+  })
+  const failed = assert.rejects(client.uploadPhoto(new File(['photo'], 'photo.jpg')), /may already be saved/)
+  await new Promise(setImmediate)
+  t.mock.timers.tick(15000)
+  assert.equal(signal.aborted, false)
+  t.mock.timers.tick(30000)
+  await failed
+  assert.equal(signal.aborted, true)
+})
+
 test('photo replacement sends authenticated multipart photo to the mobile endpoint', async () => {
   const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
   const client = new api.MobileApi('https://api.example', auth, async (url, init) => {
@@ -23,6 +57,31 @@ test('photo replacement sends authenticated multipart photo to the mobile endpoi
     return Response.json({ message: 'Saved' })
   })
   assert.deepEqual(await client.uploadPhoto(new File(['photo-bytes'], 'profile.jpg', { type: 'image/jpeg' })), { message: 'Saved' })
+})
+
+test('onboarding photo explicitly opts into version 2 while about sends only bio and interests with bearer auth', async () => {
+  const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
+  const bodies = []
+  const client = new api.MobileApi('https://api.example', auth, async (url, init) => {
+    assert.equal(init.headers.get('Authorization'), 'Bearer token-a')
+    if (url.endsWith('/profile-photo')) {
+      assert.equal(init.body.get('onboardingVersion'), '2')
+      return Response.json({ photoSaved: true, nextStep: 'about', message: 'Saved' })
+    }
+    assert.equal(url, 'https://api.example/api/mobile/onboarding/about')
+    assert.equal(init.headers.get('Content-Type'), 'application/json')
+    bodies.push(JSON.parse(init.body))
+    return Response.json({ completed: true })
+  })
+  await client.uploadPhoto(new File(['photo'], 'photo.jpg'), 2)
+  await client.saveOnboardingAbout('Hello', ['Coffee', 'Books', 'Music'])
+  assert.deepEqual(bodies, [{ bio: 'Hello', interests: ['Coffee', 'Books', 'Music'] }])
+})
+
+test('HTTP 202 cannot complete introduction even if the body claims completion', async () => {
+  const auth = { getSession: async () => ({ data: { session: session('member-a', 'token-a') }, error: null }) }
+  const client = new api.MobileApi('https://api.example', auth, async () => Response.json({ completed: true }, { status: 202 }))
+  await assert.rejects(client.saveOnboardingAbout('Hello', ['Coffee', 'Books', 'Music']), /not confirmed/)
 })
 
 test('mobile API calls the browser fetch with its global receiver', async () => {

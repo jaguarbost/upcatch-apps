@@ -10,6 +10,8 @@ export type NativeSession = {
   onboardingComplete: boolean
 }
 
+export type PhotoSaveResult = { message: string; photoSaved?: boolean; nextStep?: 'about' | 'app' }
+
 export class MobileApiError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message)
@@ -38,11 +40,29 @@ export class MobileApi {
     const call = async (token: string) => {
       const headers = new Headers(init.headers)
       headers.set('Authorization', `Bearer ${token}`)
+      const controller = new AbortController()
+      const abort = () => controller.abort()
+      if (init.signal?.aborted) controller.abort()
+      else init.signal?.addEventListener('abort', abort, { once: true })
+      let timer: ReturnType<typeof setTimeout> | undefined
       try {
-        return await this.send(`${this.origin}/api/mobile/${path}`, { ...init, headers, cache: 'no-store' })
+        return await Promise.race([
+          this.send(`${this.origin}/api/mobile/${path}`, { ...init, headers, cache: 'no-store', signal: controller.signal }),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              reject(new MobileApiError(0, path === 'profile-photo'
+                ? 'The upload is taking too long to confirm. Please check your connection and retry; your photo may already be saved.'
+                : 'UpCatch took too long to respond. Please check your connection and try again.'))
+              controller.abort()
+            }, path === 'profile-photo' ? 45000 : 15000)
+          }),
+        ])
       } catch (cause) {
         if (cause instanceof TypeError) throw new MobileApiError(0, 'Could not reach UpCatch. Please check your connection and try again.')
         throw cause
+      } finally {
+        clearTimeout(timer)
+        init.signal?.removeEventListener('abort', abort)
       }
     }
 
@@ -57,14 +77,26 @@ export class MobileApi {
     const { data: { session: current } } = await this.auth.getSession()
     if (!current || current.user.id !== memberId) throw new MobileAccountChangedError()
     if (!response.ok) {
-      const body = await response.json().catch(() => null)
+      const body = await this.readJson<{ error?: unknown }>(response).catch(() => null)
       throw new MobileApiError(response.status, typeof body?.error === 'string' ? body.error : 'Request failed. Please retry.')
     }
     return response
   }
 
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
-    return this.request(path, init).then(response => response.json() as Promise<T>)
+    return this.request(path, init).then(response => this.readJson<T>(response))
+  }
+
+  private async readJson<T>(response: Response): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([
+        response.json() as Promise<T>,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new MobileApiError(0, 'UpCatch could not finish reading the response. Please retry.')), 15000)
+        }),
+      ])
+    } finally { clearTimeout(timer) }
   }
 
   session() { return this.json<NativeSession>('session') }
@@ -76,10 +108,18 @@ export class MobileApi {
     })
   }
   dispatchNotifications() { return this.json<{ ok: true }>('notifications', { method: 'POST' }) }
-  uploadPhoto(file: File) {
+  uploadPhoto(file: File, onboardingVersion?: 2) {
     const body = new FormData()
     body.set('photo', file)
-    return this.json<{ message: string }>('profile-photo', { method: 'POST', body })
+    if (onboardingVersion === 2) body.set('onboardingVersion', '2')
+    return this.json<PhotoSaveResult>('profile-photo', { method: 'POST', body })
+  }
+  async saveOnboardingAbout(bio: string, interests: string[]) {
+    const response = await this.request('onboarding/about', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bio, interests }),
+    })
+    if (response.status !== 200) throw new MobileApiError(503, 'Your introduction was not confirmed as saved. Please retry this step.')
+    return this.readJson<{ completed: boolean; message?: string }>(response)
   }
   async memberPhoto(meetupId: string) {
     return (await this.request(`member-photo?meetup=${encodeURIComponent(meetupId)}`)).blob()

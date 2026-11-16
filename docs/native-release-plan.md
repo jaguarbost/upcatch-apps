@@ -6,6 +6,18 @@
 
 **Architecture:** Keep one deployed UpCatch backend and the existing Supabase project. The iOS and Android packages are separate clients of that backend; they must not create another database or copy server secrets into the binary. The current `CAPACITOR_SERVER_URL` setting is for device development only.
 
+## Native onboarding and supplied-image help — 2.0.4/build 10 — 2026-11-16
+
+- Connected four-stage native onboarding to the web 2.1.9 contract (`2a2b545`), including explicit photo version opt-in, saved-photo recovery, persisted Bio/interests and confirmed completion. Fixed provider completion synchronization, onboarding safe-area spacing and sequential startup checks. Existing completed members are not forced through onboarding again.
+- Added the user's three supplied How it works images as an image-only slider. WebP assets total 298,986 bytes, 93.6% less than the source PNGs. Kept the complete artwork, native theme/fonts and integrations. At the user's request to stage all code, the existing QR/iOS permission changes below are included too.
+- Native tests (70), image tests (4), push tests (13), typecheck and the native production bundle passed. Hosted About OPTIONS preflight returned HTTP 204; authenticated persistence and actual device behavior are not claimed verified. See [native-onboarding-validation.md](native-onboarding-validation.md). No database changes, web repository push/deployment or store upload. Milestones remain 25% (3/12).
+
+## iOS QR camera permission correction — 2026-11-16
+
+- Added a local Capacitor camera permission bridge using AVFoundation. The scanner's Allow camera action now requests the iOS permission before opening its video stream. Denial offers Open Settings using Apple's app-settings URL; Screen Time/device restrictions receive separate guidance. Returning from Settings retries capture. Permission-dialog visibility changes no longer cancel the pending request.
+- Kept the scanner layout and styling, replacing only the denied-permission action and message. The custom bridge controller is used by both scene startup and the storyboard. No new dependency, backend change or database change.
+- Local typecheck, production build, six QR permission/lifecycle regression tests (`node --test tests/qr-camera.mjs`), 57 existing native tests, Vite native bundle, Capacitor sync, native metadata and release checks passed. iOS storyboard and Info.plist XML parsed successfully. Swift compilation, the first permission prompt, Settings navigation, returning with Camera enabled, and QR decoding on an installed iPhone remain unverified on this Windows machine. A new iOS build/archive is required; an existing installed binary does not gain this native bridge from a web deployment. Milestone completion remains 25% (3/12).
+
 ## Native meetup/profile adaptation — 2.0.3/build 9 — 2026-11-15
 
 - Adapted the native-relevant screen changes from web commits `da32fa2` and `5bd23a1`. Added dedicated meetup Messages navigation, tappable real profiles, the yellow QR friendship footer, Not now wording, native photo replacement and hosted legal links. Preserved native startup, appearance, auth, permissions, QR and notification integrations; did not import marketing screens or metadata.

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Coffee, HeartHandshake, MapPin, QrCode, Sparkles, X } from 'lucide-react'
 import { PrimaryButton } from './primitives'
 import { useUpCatch } from './app-provider'
+import { QuickStartSlides } from './quick-start-slides'
 
 const SEEN = 'upcatch:quick-start:v1'
 const HelpContext = createContext<(() => void) | null>(null)
@@ -32,11 +33,14 @@ export function HowItWorksProvider({ children }: { children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   useEffect(() => {
-    if (!state.live || !state.onboarded || checked.current) return
+    if (!state.live || !state.onboarded || state.phase !== 'idle' || checked.current) return
     checked.current = true
     try { if (localStorage.getItem(SEEN)) return } catch {}
-    if (state.phase === 'idle') setView('quick')
+    setView('quick')
   }, [state.live, state.onboarded, state.phase])
+  useEffect(() => {
+    if (view === 'quick' && state.phase !== 'idle') { setView(null); checked.current = false }
+  }, [view, state.phase])
   useEffect(() => {
     if (view && dialog.current && !dialog.current.open) {
       previousFocus.current = document.activeElement as HTMLElement
@@ -48,11 +52,12 @@ export function HowItWorksProvider({ children }: { children: ReactNode }) {
     dialog.current?.close(); setView(null)
     previousFocus.current?.focus()
   }
-  return <HelpContext.Provider value={() => setView('full')}>
+  return <HelpContext.Provider value={() => setView('quick')}>
     {children}
-    {view && <dialog ref={dialog} onCancel={event => { event.preventDefault(); close() }} aria-labelledby="how-title" className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-[2rem] border-0 bg-card p-5 text-foreground shadow-2xl backdrop:bg-foreground/50">
+    {view === 'quick' && <QuickStartSlides onClose={close} onHelp={() => setView('full')} />}
+    {view === 'full' && <dialog ref={dialog} onCancel={event => { event.preventDefault(); close() }} aria-labelledby="how-title" className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-[2rem] border-0 bg-card p-5 text-foreground shadow-2xl backdrop:bg-foreground/50">
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-sm font-bold text-primary">A little less scrolling. A little more hello.</p><h2 id="how-title" className="mt-2 font-display text-3xl font-extrabold">{view === 'quick' ? 'Your next catch-up, made simple' : 'How UpCatch works'}</h2></div>
+        <div><p className="text-sm font-bold text-primary">A little less scrolling. A little more hello.</p><h2 id="how-title" className="mt-2 font-display text-3xl font-extrabold">How UpCatch works</h2></div>
         <button type="button" onClick={close} aria-label="Close how it works" className="press grid size-11 shrink-0 place-items-center rounded-full bg-muted"><X className="size-5" /></button>
       </div>
       <ol className="my-5 space-y-3">{STEPS.map(({ icon: Icon, title, text }, index) => <li key={title} className="flex gap-3 rounded-2xl bg-muted p-3">
@@ -60,8 +65,7 @@ export function HowItWorksProvider({ children }: { children: ReactNode }) {
         <div><h3 className="font-display font-bold">{index + 1}. {title}</h3><p className="mt-1 text-sm text-muted-foreground">{text}</p></div>
       </li>)}</ol>
       {view === 'full' && <section aria-label="Frequently asked questions" className="mb-5 space-y-2"><h3 className="font-display text-xl font-bold">A few things you might wonder</h3>{FAQ.map(([question, answer]) => <details key={question} className="rounded-2xl bg-muted p-3"><summary className="cursor-pointer font-semibold">{question}</summary><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{answer}</p></details>)}</section>}
-      <PrimaryButton onClick={close} className="w-full"><HeartHandshake className="size-5" aria-hidden="true" /> {view === 'quick' ? 'Let’s find a catch-up' : 'Got it'}</PrimaryButton>
-      {view === 'quick' && <button type="button" onClick={() => setView('full')} className="mt-3 min-h-11 w-full text-sm font-bold text-primary">Learn more & FAQs</button>}
+      <PrimaryButton onClick={close} className="w-full"><HeartHandshake className="size-5" aria-hidden="true" /> Got it</PrimaryButton>
     </dialog>}
   </HelpContext.Provider>
 }
