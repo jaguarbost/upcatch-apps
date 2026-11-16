@@ -17,9 +17,20 @@ Adapted the client contract from web `2a2b545` (web release 2.1.9), read-only. N
 ## Verification
 
 - Typecheck and native production bundle passed. All 70 native tests passed, covering completion handoff, photo failure/retry and strict success, ambiguous upload recovery, saved-photo relaunch, Bio validation and failed-save retry, completed accounts, denied location, startup identity gates, finite API deadlines, persisted appearance, authentication/deep links, and image-only slider navigation/persistence/meetup interruption.
-- Image tests: 4 passed. Push tests: 13 passed. QR permission/lifecycle tests are run separately. These are local automated tests, not device delivery or camera tests.
+- Image tests: 4 passed. Push tests: 13 passed. Separate QR permission/lifecycle tests: 6 passed. These are local automated tests, not device delivery or camera tests.
 - An isolated build checkout was used to verify the onboarding changes independently while QR work was in progress. After the user requested all code, the final release bundle was rebuilt from the combined workspace. Turbopack rejected the isolated dependency junction, so that isolated production check uses `pnpm build --webpack`; this is an environment limitation, not a source compilation result.
 - Hosted read-only check: the new About endpoint returned HTTP 204 to a native-origin OPTIONS preflight. No authenticated photo/Bio write, database mutation, email delivery or push delivery was tested against production.
+- Final combined Vite bundle, Capacitor sync, native metadata/release checks and iOS storyboard/Info.plist XML parsing passed. Source code was pushed first at `341a57c`; combined assets were pushed at `0e40b6c`, both only to `jaguarbost/upcatch-apps` main. Codemagic can build 2.0.4/build 10 from that commit; Windows cannot verify Swift compilation or Apple upload.
+
+## Signed Android AAB
+
+Built after the code and combined assets were pushed, using `scripts/build-android-aab.ps1 -Offline -RequireExistingKey` and the existing upload key. `jarsigner` verified the signature; bundletool 1.18.3 validated the bundle and confirmed versionCode **10** / versionName **2.0.4**. The archive includes the three WebP images (298,986 bytes total) and excludes the original PNGs.
+
+- Exact path: `C:\Users\dipti\upcatch-capacitor\android\app\build\outputs\bundle\release\app-release.aab`
+- Size: **21,262,697 bytes**
+- SHA-256: `92B4EB145D104F230D67CB9A37C73BD928EB5AFFDFAD45C97157634E87FC3699`
+
+The Android toolchain emitted an SDK XML version warning but completed successfully. No new APK was requested or built for this release. No app-store upload was performed. Codemagic can use code/assets commit `0e40b6c`; later evidence-only documentation changes do not require restarting an iOS build.
 
 ## Device checks still required
 
