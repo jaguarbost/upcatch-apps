@@ -26,6 +26,8 @@ import { PhotoUpload } from '@/components/account/photo-upload'
 import { version as appVersion } from '@/package.json'
 import { InstallAppCard, NotificationHelp } from '@/components/account/install-app'
 import { LearnMoreButton } from './how-it-works'
+import { InviteFriendsButton } from './invite-friends-button'
+import { ProfileName } from './profile-name'
 import { useState } from 'react'
 import { useUpCatch, type FriendStatus } from './app-provider'
 import { useAppearance } from './appearance-provider'
@@ -61,15 +63,18 @@ export function ProfileScreen() {
   return (
     <main className="absolute inset-0 z-20 overflow-y-auto bg-background pb-28 animate-in fade-in duration-200">
       <header className="flex flex-col items-center gap-3 px-5 pt-[max(env(safe-area-inset-top),1.5rem)] text-center">
+        <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={state.user.photo ?? '/placeholder-user.jpg'}
           alt="Your profile"
           className="size-28 rounded-full border-4 border-card object-cover shadow-lg"
         />
+        {state.live && <div className="absolute -bottom-1 -right-2"><PhotoUpload compact /></div>}
+        </div>
         <div>
           <h1 className="font-display text-3xl font-extrabold">
-            {state.user.name}, {state.live && !state.user.age ? '18+' : state.user.age}
+            {state.live ? <ProfileName name={state.user.name} /> : state.user.name}, {state.live && !state.user.age ? '18+' : state.user.age}
           </h1>
           <div className="mt-2 flex flex-wrap justify-center gap-1.5">
             <Pill icon={<BadgeCheck className="size-3.5" />} label={state.live ? (state.live.idApproved ? 'ID' : 'Email') : 'ID'} />
@@ -78,12 +83,8 @@ export function ProfileScreen() {
           </div>
         </div>
         {state.user.bio && <p className="max-w-sm whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{state.user.bio}</p>}
+        <InviteFriendsButton className="h-12 w-full max-w-xs px-3 text-sm" />
       </header>
-
-      {state.live && <details className="mx-4 mt-4 rounded-3xl bg-card p-4">
-        <summary className="cursor-pointer text-center text-sm font-bold text-primary">Change profile photo</summary>
-        <div className="mt-4"><PhotoUpload /></div>
-      </details>}
 
       <section className="mx-4 mt-5 grid grid-cols-3 gap-2 text-center" aria-label="Your stats">
         <Stat value={String(state.live ? state.profileStats.completed_meetups : state.history.length + 5)} label="UpCatches" />

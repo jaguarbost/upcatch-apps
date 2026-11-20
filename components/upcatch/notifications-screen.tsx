@@ -40,7 +40,8 @@ export function NotificationsScreen() {
     const onFocus = () => { void refresh() }
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh() }, 30000)
     window.addEventListener('focus', onFocus)
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus) }
+    window.addEventListener('upcatch:native-resume', onFocus)
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); window.removeEventListener('upcatch:native-resume', onFocus) }
   }, [refresh])
 
   const open = async (item: Notification, chatFromNudge = false) => {

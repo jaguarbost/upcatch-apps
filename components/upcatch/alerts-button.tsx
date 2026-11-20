@@ -25,7 +25,8 @@ export function AlertsButton(){
 
 export function MessagesButton(){
  const {state,actions}=useUpCatch()
- return <button type="button" onClick={()=>actions.setTab('messages')} aria-label="Messages" aria-current={state.tab==='messages'?'page':undefined} className="press absolute right-[4.5rem] top-[max(env(safe-area-inset-top),1rem)] z-35 grid size-12 place-items-center rounded-full bg-card/95 shadow-lg shadow-foreground/10 backdrop-blur">
+ return <button type="button" onClick={()=>actions.setTab('messages')} aria-label="Messages" aria-current={state.tab==='messages'?'page':undefined} className="press absolute right-[4.5rem] top-[max(env(safe-area-inset-top),1rem)] z-35 flex size-12 flex-col items-center justify-center gap-0.5 rounded-full bg-card/95 shadow-lg shadow-foreground/10 backdrop-blur">
   <MessageCircle className="size-5" aria-hidden="true" />
+  <span className="text-[9px] leading-none font-bold">Messages</span>
  </button>
 }

@@ -60,7 +60,11 @@ export class NativeAuthFlow {
     if (acceptedTerms) await this.store.setItem(GOOGLE_TERMS_KEY, new Date().toISOString())
     else await this.store.removeItem(GOOGLE_TERMS_KEY)
     const { data, error } = await this.auth.signInWithOAuth({
-      provider: 'google', options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
+      provider: 'google', options: {
+        redirectTo: NATIVE_AUTH_CALLBACK,
+        skipBrowserRedirect: true,
+        queryParams: { prompt: 'select_account' },
+      },
     })
     if (error || !data.url) {
       await this.store.removeItem(GOOGLE_TERMS_KEY)

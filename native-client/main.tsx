@@ -159,6 +159,7 @@ function NativeClient() {
         window.addEventListener('upcatch:native-signout', reload)
         const resume = await App.addListener('appStateChange', event => {
           if (event.isActive) window.dispatchEvent(new Event('upcatch:appearance-resume'))
+          if (event.isActive) window.dispatchEvent(new Event('upcatch:native-resume'))
           if (event.isActive && ['/app', '/onboarding'].includes(window.location.pathname)) refresh(current)
         })
         releaseResume = async () => {

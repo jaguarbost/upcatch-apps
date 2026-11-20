@@ -49,11 +49,13 @@ export function observeLocationPermission(onChange: (state: PermissionState | 'u
   }
   void check()
   window.addEventListener('focus', check)
+  window.addEventListener('upcatch:native-resume', check)
   document.addEventListener('visibilitychange', check)
   return () => {
     active = false
     permission?.removeEventListener('change', changed)
     window.removeEventListener('focus', check)
+    window.removeEventListener('upcatch:native-resume', check)
     document.removeEventListener('visibilitychange', check)
   }
 }

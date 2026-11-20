@@ -14,5 +14,8 @@ project(':capacitor-browser').projectDir = new File('../node_modules/.pnpm/@capa
 include ':capacitor-geolocation'
 project(':capacitor-geolocation').projectDir = new File('../node_modules/.pnpm/@capacitor+geolocation@8.2.3_@capacitor+core@8.6.0/node_modules/@capacitor/geolocation/android')
 
+include ':capacitor-share'
+project(':capacitor-share').projectDir = new File('../node_modules/.pnpm/@capacitor+share@8.0.3_@capacitor+core@8.6.0/node_modules/@capacitor/share/android')
+
 include ':onesignal-capacitor-plugin'
 project(':onesignal-capacitor-plugin').projectDir = new File('../node_modules/.pnpm/@onesignal+capacitor-plugin@1.2.0_@capacitor+core@8.6.0/node_modules/@onesignal/capacitor-plugin/android')

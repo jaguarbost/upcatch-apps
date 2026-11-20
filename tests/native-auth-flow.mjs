@@ -53,6 +53,7 @@ test('Google terms choice survives a cold return and recovery cannot consume it'
   const { flow, calls, values } = fixture()
   await flow.startGoogle(true)
   assert.equal(calls[0][1].options.skipBrowserRedirect, true)
+  assert.equal(calls[0][1].options.queryParams.prompt, 'select_account')
   assert.equal(calls[1][0], 'browser')
   const result = await flow.finishCode({ kind: 'code', code: 'test-code', destination: '/start' })
   assert.deepEqual(result, { kind: 'route', path: '/start' })
@@ -68,6 +69,18 @@ test('Google terms choice survives a cold return and recovery cannot consume it'
   await emailReturn.flow.startGoogle(true)
   assert.deepEqual(await emailReturn.flow.finishCode({ kind: 'code', code: 'email-code', destination: '/start' }), { kind: 'needs-terms' })
   assert.equal(emailReturn.calls.filter(call => call[0] === 'terms').length, 0)
+})
+
+test('Google login requests account selection on every new sign-in attempt', async () => {
+  const { flow, calls } = fixture()
+  await flow.startGoogle(false)
+  await flow.startGoogle(false)
+  const attempts = calls.filter(call => call[0] === 'google')
+  assert.equal(attempts.length, 2)
+  for (const [, options] of attempts) {
+    assert.equal(options.options.queryParams.prompt, 'select_account')
+    assert.equal(options.options.redirectTo, 'uk.co.upcatch.app://auth/callback')
+  }
 })
 
 test('email token requires a confirmation action', async () => {

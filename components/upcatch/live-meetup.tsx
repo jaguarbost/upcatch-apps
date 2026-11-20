@@ -8,6 +8,8 @@ import { useUpCatch, useVenueLookup } from './app-provider'
 import { BottomSheet, PersonAvatar, PrimaryButton } from './primitives'
 import { SafetySheet, type SheetKind } from './safety-sheet'
 import { RequestProfile } from './request-profile'
+import { InviteFriendsButton } from './invite-friends-button'
+import styles from './live-meetup.module.css'
 
 export function LiveMeetup() {
   const { state, actions } = useUpCatch()
@@ -128,9 +130,16 @@ export function LiveMeetup() {
               </PrimaryButton>
             )}
 
-            <PrimaryButton onClick={() => actions.openMessages('live')} className="h-16 w-full text-lg">
-              <MessageCircle className="size-6" aria-hidden="true" /> Msgs {state.messages.length}
-            </PrimaryButton>
+            <div className="grid grid-cols-2 gap-2">
+              <PrimaryButton onClick={() => actions.openMessages('live')} className="h-14 min-w-0 px-2 text-sm">
+                <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 text-left leading-tight"><span className="block">Message</span><span className="block truncate">{m.person.name}</span></span>
+              </PrimaryButton>
+              <PrimaryButton variant="live" onClick={() => actions.openFriends('show', m.person)} className={cn('h-14 min-w-0 gap-1.5 px-2 text-sm', styles.becomeFriends)}>
+                <QrCode className="size-4 shrink-0" aria-hidden="true" /> <span className="whitespace-nowrap">Become friends</span>
+              </PrimaryButton>
+            </div>
+            <InviteFriendsButton className="h-12 w-full px-3 text-sm" />
 
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -148,10 +157,6 @@ export function LiveMeetup() {
                 <Flag className="size-4" aria-hidden="true" /> Report
               </button>
             </div>
-            <PrimaryButton variant="live" onClick={() => actions.openFriends('show', m.person)} className="min-h-20 w-full justify-between gap-4 px-4 text-left">
-              <span className="text-sm leading-snug">Become friends to stay connected for future UpCatches.</span>
-              <QrCode className="size-8 shrink-0" aria-hidden="true" />
-            </PrimaryButton>
           </div>
         </BottomSheet>
       </div>

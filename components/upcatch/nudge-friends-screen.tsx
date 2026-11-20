@@ -38,7 +38,14 @@ export function NudgeFriendsScreen() {
       if (error) { setNotice(error.code === 'P0001' ? error.message : error.code === 'PGRST202' ? 'Nudge Friends is being updated. Please try again shortly.' : 'Could not send your nudge. Please retry.'); return }
       const count = Number((data as { sent?: number } | null)?.sent ?? 0)
       setNotice(count ? `Nudged ${count} ${count === 1 ? 'friend' : 'friends'}.` : 'Your friends already have a nudge waiting.')
-      if (count) void fetch('/api/notifications', { method: 'POST' }).catch(() => undefined)
+      if (count) {
+        try {
+          const response = await fetch('/api/notifications', { method: 'POST' })
+          if (!response.ok) throw new Error('Dispatch unavailable')
+        } catch {
+          setNotice(`Nudged ${count} ${count === 1 ? 'friend' : 'friends'}. Your request is saved, but push dispatch could not be confirmed.`)
+        }
+      }
     } catch { setNotice('Connection lost. Please try again.') }
     finally { setBusy(false) }
   }

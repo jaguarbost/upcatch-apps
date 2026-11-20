@@ -8,6 +8,7 @@ import { saveDetails } from '@/app/onboarding/actions'
 import { initialOnboardingStep, LIVE_ONBOARDING_STEPS, validateOnboardingAbout } from '@/lib/onboarding-flow'
 import { saveOnboardingPhoto, saveOnboardingAbout } from '@/lib/onboarding-transport'
 import { prepareProfilePhoto } from '@/lib/prepare-profile-photo'
+import { PhotoCrop } from '@/components/account/photo-crop'
 import { haptic } from '@/lib/haptics'
 import { INTERESTS, PEOPLE } from '@/lib/upcatch-data'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ export function Onboarding() {
   const photoSelection=useRef(0)
   const savingRef=useRef(false)
   const [photoFile,setPhotoFile]=useState<File|null>(null)
+  const [cropFile,setCropFile]=useState<File|null>(null)
   const [saving,setSaving]=useState(false)
   const [saveError,setSaveError]=useState('')
   async function selectPhoto(file?:File){
@@ -47,7 +49,7 @@ export function Onboarding() {
     setSaveError('');setPhotoLoading(true)
     try{
       const prepared=await prepareProfilePhoto(file)
-      if(selection===photoSelection.current){setPhotoFile(prepared);setPhotoSaved(false)}
+      if(selection===photoSelection.current)setCropFile(prepared)
     }catch(error){if(selection===photoSelection.current)setSaveError(error instanceof Error?error.message:'This photo could not be prepared. Please choose another.')}
     finally{if(selection===photoSelection.current)setPhotoLoading(false)}
   }
@@ -392,6 +394,7 @@ export function Onboarding() {
           </PrimaryButton>
         )}
       </footer>
+      {cropFile&&<PhotoCrop file={cropFile} onCancel={()=>setCropFile(null)} onConfirm={cropped=>{setPhotoFile(cropped);setPhotoSaved(false);setCropFile(null)}}/>}
     </main>
   )
 }

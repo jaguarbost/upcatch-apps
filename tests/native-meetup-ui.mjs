@@ -35,6 +35,9 @@ async function fixture(path, imports = {}) {
     './primitives': Object.fromEntries(['BottomSheet', 'PersonAvatar', 'PrimaryButton', 'Chip', 'CountdownRing', 'Verified'].map(name => [name, name])),
     './request-profile': { RequestProfile: 'RequestProfile' },
     './safety-sheet': { SafetySheet: 'SafetySheet' },
+    './invite-friends-button': { InviteFriendsButton: 'InviteFriendsButton' },
+    './live-meetup.module.css': { default: { becomeFriends: 'becomeFriends' } },
+    '@/components/account/photo-crop': { PhotoCrop: 'PhotoCrop' },
     ...imports,
   }
   const compiled = ts.transpileModule(await readFile(path, 'utf8'), {
@@ -46,7 +49,7 @@ async function fixture(path, imports = {}) {
     return mocks[name]
   }, exports)
   return {
-    render(name, props) { cursor = 0; const tree = exports[name](props); for (const effect of pending.splice(0)) effect(); return tree },
+    render(name, props = {}) { cursor = 0; const tree = exports[name](props); for (const effect of pending.splice(0)) effect(); return tree },
     close() { for (const slot of slots) slot?.cleanup?.() },
   }
 }
@@ -94,6 +97,8 @@ test('photo failure preserves selected file; success advances to step four and b
   const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
   nodes(tree).find(node => node.type === 'input' && node.props.type === 'file').props.onChange({ target: { files: [file], value: 'photo.jpg' } })
   await new Promise(setImmediate)
+  tree = view.render('Onboarding'); tree = view.render('Onboarding')
+  nodes(tree).find(node => node.type === 'PhotoCrop').props.onConfirm(file)
   tree = view.render('Onboarding'); tree = view.render('Onboarding')
   await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
   tree = view.render('Onboarding')
@@ -225,18 +230,21 @@ test('onboarding exits the photo flow when refreshed bootstrap confirms completi
   view.close()
 })
 
-test('meetup button opens its live conversation using loaded count and keeps QR friendship flow', async () => {
+test('paired actions open the live conversation and QR friendship flow with an invite below', async () => {
   const calls = []
   const state = { meetup: { person, intent: 'coffee', startLabel: '12:00', endLabel: '13:00' }, phase: 'arrived', live: {}, progress: { me: 1, them: 1 }, user: {}, messages: [{ id: 1 }, { id: 2 }] }
   const actions = { openMessages: target => calls.push(['messages', target]), openFriends: (...args) => calls.push(['friends', ...args]) }
   const view = await fixture('components/upcatch/live-meetup.tsx', { './app-provider': { useUpCatch: () => ({ state, actions }), useVenueLookup: () => () => venue }, '@/lib/upcatch-data': data })
   let tree = view.render('LiveMeetup')
-  const messages = nodes(tree).find(node => node.type === 'PrimaryButton' && text(node).includes('Msgs'))
-  assert.equal(text(messages).trim(), 'Msgs 2')
+  const messages = nodes(tree).find(node => node.type === 'PrimaryButton' && text(node).includes('MessageSam'))
+  assert.equal(text(messages).trim(), 'MessageSam')
   messages.props.onClick()
   const footer = nodes(tree).find(node => node.type === 'PrimaryButton' && text(node).includes('Become friends'))
   assert.equal(footer.props.variant, 'live')
   footer.props.onClick()
+  const row = nodes(tree).find(node => node.props?.children?.includes?.(messages) && node.props?.children?.includes?.(footer))
+  assert.ok(row, 'Message and Become friends share a row')
+  assert.ok(nodes(tree).some(node => node.type === 'InviteFriendsButton'))
   assert.deepEqual(calls, [['messages', 'live'], ['friends', 'show', person]])
   nodes(tree).find(node => node.props?.['aria-label'] === 'View Sam profile').props.onClick()
   tree = view.render('LiveMeetup')
@@ -288,7 +296,7 @@ test('live Messages retains persisted timestamps and venue suggestions and sends
 test('native profile photo prepares selected file, uploads photo field and refreshes native bootstrap on success', async t => {
   const events = [], uploads = [], prepared = new File(['prepared'], 'profile.jpg', { type: 'image/jpeg' })
   const previousWindow = global.window
-  global.window = { dispatchEvent: event => events.push(event.type) }
+  global.window = { dispatchEvent: event => events.push(event.type), setTimeout, clearTimeout }
   t.after(() => { global.window = previousWindow })
   const view = await fixture('native-client/profile-photo-upload.tsx', {
     '@/components/upcatch/primitives': { PrimaryButton: 'PrimaryButton' },
@@ -299,6 +307,9 @@ test('native profile photo prepares selected file, uploads photo field and refre
   assert.equal(nodes(tree).find(node => node.props?.capture === 'user').type, 'input')
   nodes(tree).find(node => node.type === 'input' && !node.props.capture).props.onChange({ target: { files: [new File(['original'], 'photo.png')], value: 'photo.png' } })
   await new Promise(setImmediate)
+  tree = view.render('PhotoUpload')
+  assert.equal(uploads.length, 0, 'selection waits for crop confirmation')
+  nodes(tree).find(node => node.type === 'PhotoCrop').props.onConfirm(prepared)
   tree = view.render('PhotoUpload')
   nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
   await new Promise(setImmediate)
@@ -322,4 +333,137 @@ test('native legal links use hosted browser pages without replacing signed-in ap
     assert.equal(prevented, true)
   }
   assert.deepEqual(opened, ['https://www.upcatch.uk/terms', 'https://www.upcatch.uk/privacy'])
+})
+
+test('compact native photo waits for cropping, preserves a failed upload and retries without reopening selection', async t => {
+  const previousWindow = global.window
+  const events = [], uploads = []
+  global.window = { dispatchEvent: event => events.push(event.type), setTimeout, clearTimeout }
+  t.after(() => { global.window = previousWindow })
+  const file = new File(['cropped'], 'profile.jpg', { type: 'image/jpeg' })
+  const view = await fixture('native-client/profile-photo-upload.tsx', {
+    '@/components/upcatch/primitives': { PrimaryButton: 'PrimaryButton' },
+    '@/lib/prepare-profile-photo': { prepareProfilePhoto: async () => file },
+    './onboarding-actions': { uploadPhoto: async (_, form) => {
+      uploads.push(form.get('photo'))
+      return uploads.length === 1 ? { error: 'Connection lost' } : { message: 'Saved' }
+    } },
+  })
+  let tree = view.render('PhotoUpload', { compact: true })
+  assert.ok(nodes(tree).some(node => node.props?.['aria-label'] === 'Change profile photo'))
+  nodes(tree).find(node => node.type === 'input' && !node.props.capture).props.onChange({ target: { files: [file] } })
+  await new Promise(setImmediate)
+  tree = view.render('PhotoUpload', { compact: true })
+  assert.equal(uploads.length, 0)
+  nodes(tree).find(node => node.type === 'PhotoCrop').props.onConfirm(file)
+  await new Promise(setImmediate)
+  tree = view.render('PhotoUpload', { compact: true })
+  assert.ok(text(tree).includes('Connection lost'))
+  assert.equal(events.length, 0)
+  await nodes(tree).find(node => node.type === 'PrimaryButton').props.onClick()
+  tree = view.render('PhotoUpload', { compact: true })
+  assert.equal(uploads.length, 2)
+  assert.deepEqual(events, ['upcatch:native-reload'])
+  assert.ok(text(tree).includes('Photo saved.'))
+  view.close()
+})
+
+test('native invite opens system sharing and falls back to copying the public invite link', async t => {
+  const calls = [], notices = []
+  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => calls.push(text) } })
+  t.after(() => { if (previousClipboard) Object.defineProperty(navigator, 'clipboard', previousClipboard); else delete navigator.clipboard })
+  let fail = false
+  const view = await fixture('components/upcatch/invite-friends-button.tsx', {
+    '@capacitor/core': { Capacitor: { isNativePlatform: () => true } },
+    '@capacitor/share': { Share: { share: async options => { if (fail) throw Error('Sharing unavailable'); calls.push(options) } } },
+    './app-provider': { useUpCatch: () => ({ actions: { showToast: text => notices.push(text) } }) },
+  })
+  view.render('InviteFriendsButton').props.onClick()
+  await new Promise(setImmediate)
+  assert.equal(calls[0].url, 'https://www.upcatch.uk')
+  fail = true
+  view.render('InviteFriendsButton').props.onClick()
+  await new Promise(setImmediate)
+  assert.ok(calls[1].endsWith('https://www.upcatch.uk'))
+  assert.ok(notices[0].includes('copied'))
+  view.close()
+})
+
+test('saved nudge survives failed native dispatch without resending the RPC', async t => {
+  const previousFetch = global.fetch, previousWindow = global.window
+  const calls = []
+  global.window = { setInterval: () => 1, clearInterval() {}, addEventListener() {}, removeEventListener() {} }
+  global.fetch = async url => { calls.push(url); return { ok: false } }
+  t.after(() => { global.fetch = previousFetch; global.window = previousWindow })
+  const view = await fixture('components/upcatch/nudge-friends-screen.tsx', {
+    './app-provider': { useUpCatch: () => ({ state: { live: {}, friends: [{ person, status: 'offline' }] }, actions: {} }) },
+    './use-friend-nudges': { useFriendNudges: () => ({ nudges: [], loading: false }) },
+    '@/lib/supabase/client': { createClient: () => ({ rpc: async (name, args) => {
+      if (name === 'nearby_nudge_friends') return { data: [person.id] }
+      calls.push(args)
+      return { data: { sent: 1 } }
+    } }) },
+  })
+  view.render('NudgeFriendsScreen')
+  await new Promise(setImmediate)
+  let tree = view.render('NudgeFriendsScreen')
+  await nodes(tree).find(node => node.type === 'button' && text(node) === 'Nudge').props.onClick()
+  await new Promise(setImmediate)
+  tree = view.render('NudgeFriendsScreen')
+  assert.ok(text(tree).includes('Your request is saved, but push dispatch could not be confirmed.'))
+  assert.deepEqual(calls, [{ p_recipient: person.id }, '/api/notifications'])
+  view.close()
+})
+
+test('profile name saves a trimmed name through the owner RPC and keeps a failed edit for retry', async t => {
+  const previousWindow = global.window, previousDocument = global.document
+  const calls = [], events = []
+  global.window = { dispatchEvent: event => events.push(event.type) }
+  global.document = { body: {} }
+  t.after(() => { global.window = previousWindow; global.document = previousDocument })
+  const view = await fixture('components/upcatch/profile-name.tsx', {
+    'react-dom': { createPortal: element => element },
+    '@/lib/supabase/client': { createClient: () => ({ rpc: async (name, args) => {
+      calls.push({ name, args }); return calls.length === 1 ? { error: {} } : { error: null }
+    } }) },
+  })
+  let tree = view.render('ProfileName', { name: 'Sam' })
+  nodes(tree).find(node => node.props?.['aria-label'] === 'Edit profile name').props.onClick()
+  tree = view.render('ProfileName', { name: 'Sam' })
+  nodes(tree).find(node => node.type === 'input').props.onChange({ target: { value: '  Taylor  ' } })
+  tree = view.render('ProfileName', { name: 'Sam' })
+  await nodes(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  tree = view.render('ProfileName', { name: 'Sam' })
+  assert.ok(text(tree).includes('Your name could not be saved. Please retry.'))
+  assert.equal(nodes(tree).find(node => node.type === 'input').props.value, '  Taylor  ')
+  assert.deepEqual(events, [])
+  await nodes(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  tree = view.render('ProfileName', { name: 'Sam' })
+  assert.equal(nodes(tree).some(node => node.type === 'dialog'), false)
+  assert.ok(text(tree).includes('Taylor'))
+  assert.deepEqual(calls, [1, 2].map(() => ({ name: 'save_profile', args: { p_name: 'Taylor', p_adult: true } })))
+  assert.deepEqual(events, ['upcatch:native-reload'])
+  view.close()
+})
+
+test('location settings routes Android app access and device location separately; iOS opens app Settings', async () => {
+  const code = ts.transpileModule(await readFile('lib/native/location-settings.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  let platform = 'android'
+  const calls = [], exports = {}
+  new Function('require', 'exports', code)(() => ({
+    Capacitor: { isNativePlatform: () => platform !== 'web', getPlatform: () => platform },
+    registerPlugin: name => ({
+      openAppSettings: async () => calls.push([name, 'app']),
+      openLocationSettings: async () => calls.push([name, 'location']),
+      openSettings: async () => calls.push([name, 'ios']),
+    }),
+  }), exports)
+  await exports.openLocationSettings(true)
+  await exports.openLocationSettings(false)
+  platform = 'ios'
+  await exports.openLocationSettings(true)
+  platform = 'web'
+  await assert.rejects(exports.openLocationSettings(), /phone Settings/)
+  assert.deepEqual(calls, [['UpCatchSettings', 'app'], ['UpCatchSettings', 'location'], ['UpCatchCamera', 'ios']])
 })

@@ -22,10 +22,12 @@ export function useFriendNudges(live: boolean) {
     const timer = window.setInterval(() => { void refresh() }, 30000)
     const onUpdate = () => { void refresh() }
     window.addEventListener('focus', onUpdate)
+    window.addEventListener('upcatch:native-resume', onUpdate)
     window.addEventListener('upcatch:nudges-changed', onUpdate)
     return () => {
       window.clearInterval(timer)
       window.removeEventListener('focus', onUpdate)
+      window.removeEventListener('upcatch:native-resume', onUpdate)
       window.removeEventListener('upcatch:nudges-changed', onUpdate)
     }
   }, [refresh])

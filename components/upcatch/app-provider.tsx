@@ -130,8 +130,8 @@ function useUpCatchState(initial?: LiveBootstrap) {
   }, [initial?.completed])
   const [user, setUser] = useState<UserProfile>(initial ? { name: initial.name, age: 0, photo: initial.photo, bio: initial.bio ?? '', interests: initial.interests ?? [] } : { name: 'Alex', age: 29, photo: '/people/alex.png', interests: ['Coffee', 'Design', 'Startups', 'Running'] })
   useEffect(() => {
-    if (initial) setUser(current => ({ ...current, photo: initial.photo, ...(initial.bio !== undefined ? { bio: initial.bio } : {}), ...(initial.interests ? { interests: initial.interests } : {}) }))
-  }, [initial?.photo, initial?.bio, initial?.interests])
+    if (initial) setUser(current => ({ ...current, name: initial.name, photo: initial.photo, ...(initial.bio !== undefined ? { bio: initial.bio } : {}), ...(initial.interests ? { interests: initial.interests } : {}) }))
+  }, [initial?.name, initial?.photo, initial?.bio, initial?.interests])
   const [tab, setTab] = useState<Tab>('map')
   const [phase, setPhase] = useState<Phase>('idle')
   const [freeForMin, setFreeForMin] = useState(60)

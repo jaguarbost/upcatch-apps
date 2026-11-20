@@ -1,0 +1,40 @@
+@property --friend-border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.becomeFriends {
+  position: relative;
+}
+
+.becomeFriends::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(
+    from var(--friend-border-angle),
+    transparent 25%,
+    var(--primary) 45%,
+    var(--primary) 55%,
+    transparent 75%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: friendBorderSpin 2.5s linear infinite;
+}
+
+@keyframes friendBorderSpin {
+  to {
+    --friend-border-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .becomeFriends::after {
+    animation: none;
+  }
+}
