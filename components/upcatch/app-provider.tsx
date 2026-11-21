@@ -709,7 +709,7 @@ function useUpCatchState(initial?: LiveBootstrap) {
         const {error}=await createClient().rpc('create_scheduled_post',{p_intent:draft.intent,p_starts_at:date.toISOString(),p_note:draft.note.trim(),p_duration:draft.durationMin,p_radius:draft.radiusKm,p_preferences:draft.prefs})
         if(error){showToast(error.code==='P0001'?error.message:'Could not create your invite. Please retry.');return}
         void fetch('/api/notifications',{method:'POST'}).catch(()=>undefined)
-        setScheduledPostNotice('Your scheduled invite is live on the Wall.')
+        setScheduledPostNotice('Your scheduled invite is live in Events.')
         setCreateStep(0);setTab('wall')
       }catch{showToast('Connection lost. Please try again.')}finally{busy.current=false;setScheduledBusy(false)}})()
     },

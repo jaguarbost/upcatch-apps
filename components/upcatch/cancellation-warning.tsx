@@ -6,7 +6,7 @@ export function CancellationWarning({ onKeep, onCancel, paired = true }: { onKee
       <h2 id="cancel-warning-title" className="font-display text-2xl font-extrabold">Cancel this meetup?</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{paired
         ? 'Cancelling after pairing will lower your show-up score. Repeated cancellations may limit future meetups on UpCatch.'
-        : 'This invite has not been paired yet. Removing it will take it off the Wall.'}</p>
+        : 'This invite has not been paired yet. Removing it will take it off Events.'}</p>
       <div className="mt-6 flex flex-col gap-2">
         <button type="button" onClick={onKeep} className="press min-h-12 rounded-2xl bg-muted font-bold">Keep meetup</button>
         <button type="button" onClick={onCancel} className="press min-h-12 rounded-2xl bg-destructive font-bold text-destructive-foreground">Go ahead and cancel</button>

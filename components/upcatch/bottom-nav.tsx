@@ -37,7 +37,7 @@ export function BottomNav() {
       className="pb-safe absolute inset-x-0 bottom-0 z-30 rounded-t-[1.75rem] border-t border-border/60 bg-card/95 px-2 pt-1.5 backdrop-blur-xl"
     >
       <div className="flex items-end">
-        {item('wall', 'Wall', <LayoutGrid className="size-5" aria-hidden="true" />)}
+        {item('wall', 'Events', <LayoutGrid className="size-5" aria-hidden="true" />)}
         {item('nudges', 'Nudge', <Send className="size-5" aria-hidden="true" />)}
 
         <div className="flex min-w-0 flex-1 justify-center">

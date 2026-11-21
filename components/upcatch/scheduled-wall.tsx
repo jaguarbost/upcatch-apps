@@ -63,7 +63,7 @@ export function ScheduledWall({ enabled }: { enabled: boolean }) {
       setCursor(last ? { starts_at: last.starts_at, post_id: last.post_id } : after)
       setHasMore(page.length === PAGE_SIZE)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load the wall.')
+      setError(cause instanceof Error ? cause.message : 'Could not load events.')
     } finally {
       setLoading(false)
     }
@@ -117,7 +117,7 @@ export function ScheduledWall({ enabled }: { enabled: boolean }) {
       if (saveError) throw saveError
       setPosts((current) => current.filter((post) => post.post_id !== postId))
       setConfirmCancel(null)
-      setNotice(matched ? 'Meetup cancelled for both of you.' : 'Your post was removed from the wall.')
+      setNotice(matched ? 'Meetup cancelled for both of you.' : 'Your post was removed from Events.')
       if(matched)await actions.refreshFriends()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not remove your post.')
@@ -128,17 +128,17 @@ export function ScheduledWall({ enabled }: { enabled: boolean }) {
 
   if (!enabled) return <section className="rounded-3xl bg-card p-6 text-center">
     <CalendarDays className="mx-auto size-9 text-primary" aria-hidden="true" />
-    <h2 className="mt-3 font-display text-xl font-extrabold">Scheduled wall</h2>
+    <h2 className="mt-3 font-display text-xl font-extrabold">Scheduled invites</h2>
     <p className="mt-2 text-sm text-muted-foreground">Sign in to see plans in your city.</p>
   </section>
 
-  return <section className="flex flex-col gap-3" aria-label="Scheduled wall">
+  return <section className="flex flex-col gap-3" aria-label="Events">
     <div className="flex items-center justify-between gap-3">
       <div>
-        <h2 className="font-display text-xl font-extrabold">Scheduled wall</h2>
+        <h2 className="font-display text-xl font-extrabold">Scheduled invites</h2>
         <p className="text-xs text-muted-foreground">Plans in your city. Meet only at a public venue.</p>
       </div>
-      <button type="button" onClick={() => void loadPage(null, true, filter)} disabled={loading} aria-label="Refresh scheduled wall" className="press grid size-11 shrink-0 place-items-center rounded-full bg-muted disabled:opacity-50">
+      <button type="button" onClick={() => void loadPage(null, true, filter)} disabled={loading} aria-label="Refresh events" className="press grid size-11 shrink-0 place-items-center rounded-full bg-muted disabled:opacity-50">
         <RefreshCw className={loading ? 'size-5 animate-spin' : 'size-5'} aria-hidden="true" />
       </button>
     </div>

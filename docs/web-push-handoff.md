@@ -1,5 +1,20 @@
 # Prompt for the separate UpCatch web workspace
 
+## Current request — anonymous nudge phone notifications — 21 November 2026
+
+Implement this in the web workspace only. The user wants the phone notification to hide who nudged them so they return to the app. Keep the new blue timed Nudge screen identifying the sender after the user opens the app.
+
+Use this exact push copy for selected and bulk nudges:
+
+- Title: `A friend nudged you`
+- Body: `Open UpCatch to see who wants to catch up.`
+
+In `lib/server/notifications.ts`, sanitize at the final OneSignal delivery boundary, before constructing `headings` and `contents`. Recognize a nudge by `job.payload?.route === 'nudges'` or an existing `nudge_id`. Override both fields for every nudge; do not trust an old queued payload's title/text. This protects already queued jobs containing names without rewriting production rows. Keep `data.route: 'notifications'`, the existing app/web launch URLs, account aliases, opt-in, recipient-only dispatch, idempotency and the original 30-minute deadline. Do not put the sender's name or photo into other visible push fields. Keep non-nudge notification copy unchanged.
+
+Add mocked OneSignal tests for a selected nudge and multiple bulk-recipient jobs whose stored payloads contain names. Assert the outgoing JSON's visible text contains neither name, receives the generic title/body above, retains notification tap routing and original expiry, and still sends only to eligible opted-in recipients. Test an old queued nudge payload too. Run relevant push/database tests, typecheck and build, then follow this workspace's deployment permissions. A Git push alone does not deploy this delivery fix.
+
+The native workspace read-only check confirmed `202611200003_thirty_minute_nudges.sql` is now recorded and `my_sent_friend_nudges()` exists. The Capacitor client is being updated to the new rows/countdowns and preserves bearer dispatch plus native resume refresh. Do not reapply the migration. Inspect hosted status again before any backend action. No server deployment or production queue mutation was performed from the Capacitor workspace for this request; device privacy and delivery remain unverified until the updated backend and a real notification are tested.
+
 ## Confirmed follow-up findings, after native source push c136253
 
 - Recent message and nudge jobs now fail with `Push provider returned 400`, while meetup offer jobs are sent. Web source `5e5cd5a:lib/server/notifications.ts` uses a top-level `url` for all pushes and additionally `app_url` for message/nudge pushes. OneSignal documents these as mutually exclusive: use `web_url` for browser destinations and `app_url` for mobile destinations, or `web_url` plus mobile Additional Data/click handling. Do not combine `url` with platform-specific URL fields. This source defect matches exactly which event types are rejected; the current sender only records HTTP status, not the provider's validation body.

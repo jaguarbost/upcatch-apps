@@ -41,7 +41,8 @@ export async function runNotificationChecks(db,{city,asUser,check}) {
   const nudge=(await db.query("select payload from private.notification_jobs where user_id=$1 and payload->>'route'='nudges'",[b])).rows[0]
   check(Boolean(nudge),'Explicit nudge queues push for an offline recipient')
   check((await db.query('select public.friend_nudge_push_active($1) ok',[nudge.payload.nudge_id])).rows[0].ok,'Offline nudge remains eligible for push delivery')
-  check(nudge.payload.text==='A friend is requesting to connect on UpCatch.','Nudge push does not disclose the sender name')
+  const nudgeCreated=(await db.query('select created_at from private.friend_nudges where id=$1',[nudge.payload.nudge_id])).rows[0].created_at
+  check(Date.parse(nudge.payload.expires_at)===new Date(nudgeCreated).getTime()+30*60*1000,'Nudge delivery deadline preserves the original 30-minute window')
   check((await db.query('select count(*)::int n from private.friend_messages where nudge_id=$1',[nudge.payload.nudge_id])).rows[0].n===1,'Nudge creates one conversation message without an extra message push')
   await asUser(b,()=>db.query('select public.dismiss_friend_nudge($1)',[nudge.payload.nudge_id]))
   const repeated=await asUser(a,()=>db.query('select public.nudge_friends($1) result',[b]))
@@ -52,6 +53,19 @@ export async function runNotificationChecks(db,{city,asUser,check}) {
   await asUser(b,()=>db.query('select public.dismiss_friend_nudge($1)',[pending.id]))
   const repeatedBulk=await asUser(a,()=>db.query('select public.nudge_friends(null) result'))
   check(repeatedBulk.rows[0].result.sent===1,'Bulk nudges have no six-hour cooldown after pending requests are dismissed')
+  const sentNudges=await asUser(a,()=>db.query('select public.my_sent_friend_nudges() nudges'))
+  check(sentNudges.rows[0].nudges.length===1 && sentNudges.rows[0].nudges[0].recipient_id===b,'Sender restores the active recipient and persisted timestamp')
+  const receivedNudges=await asUser(b,()=>db.query('select public.my_friend_nudges() nudges'))
+  check(receivedNudges.rows[0].nudges.length===1 && receivedNudges.rows[0].nudges[0].sender_name==='Push test','Received rows reveal the friend only inside the authenticated app')
+  const activeNudge=sentNudges.rows[0].nudges[0]
+  const messageCount=(await db.query('select count(*)::int n from private.friend_messages where nudge_id is not null and sender_id=$1',[a])).rows[0].n
+  await db.query("update private.friend_nudges set created_at=now()-interval '31 minutes' where id=$1",[activeNudge.id])
+  check((await asUser(a,()=>db.query('select public.my_sent_friend_nudges() nudges'))).rows[0].nudges.length===0,'Expired sent rows disappear without restarting their clock')
+  check((await asUser(b,()=>db.query('select public.my_friend_nudges() nudges'))).rows[0].nudges.length===0,'Expired received rows disappear')
+  check(!(await db.query('select public.friend_nudge_push_active($1) ok',[activeNudge.id])).rows[0].ok,'Expired nudges cannot be pushed')
+  check((await asUser(a,()=>db.query('select public.nudge_friends($1) result',[b]))).rows[0].result.sent===1,'Sender can nudge again after expiry')
+  check((await db.query('select count(*)::int n from private.friend_messages where nudge_id is not null and sender_id=$1',[a])).rows[0].n===messageCount+1,'Expiry and resend preserve prior chat messages')
+  check(!(await db.query("select has_function_privilege('anon','public.my_sent_friend_nudges()','execute') ok")).rows[0].ok,'Anonymous callers cannot restore sent nudges')
   await db.query('update public.notification_preferences set push_enabled=false where user_id=$1',[b])
   await asUser(a,()=>db.query("select public.send_friend_message($1,'Push disabled')",[b]))
   check((await db.query("select count(*)::int n from private.notification_jobs where user_id=$1 and payload->>'chat'='friend'",[b])).rows[0].n===1,'New messages respect the recipient push opt-out')

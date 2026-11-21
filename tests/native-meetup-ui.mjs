@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import ts from 'typescript'
 
+const nudgeExpiry = {}
+new Function('exports', ts.transpileModule(await readFile('lib/nudge-expiry.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(nudgeExpiry)
+
 // Exercise component events and effects without claiming an installed-device test.
 async function fixture(path, imports = {}) {
   let cursor = 0
@@ -38,6 +41,8 @@ async function fixture(path, imports = {}) {
     './invite-friends-button': { InviteFriendsButton: 'InviteFriendsButton' },
     './live-meetup.module.css': { default: { becomeFriends: 'becomeFriends' } },
     '@/components/account/photo-crop': { PhotoCrop: 'PhotoCrop' },
+    '@/lib/nudge-expiry': nudgeExpiry,
+    './use-nudge-clock': { useNudgeClock: () => Date.now() },
     ...imports,
   }
   const compiled = ts.transpileModule(await readFile(path, 'utf8'), {
@@ -398,7 +403,9 @@ test('saved nudge survives failed native dispatch without resending the RPC', as
   t.after(() => { global.fetch = previousFetch; global.window = previousWindow })
   const view = await fixture('components/upcatch/nudge-friends-screen.tsx', {
     './app-provider': { useUpCatch: () => ({ state: { live: {}, friends: [{ person, status: 'offline' }] }, actions: {} }) },
-    './use-friend-nudges': { useFriendNudges: () => ({ nudges: [], loading: false }) },
+    './use-friend-nudges': { useFriendNudges: () => ({ nudges: [], sent: [], loading: false, refresh: async () => {} }) },
+    './use-nudge-clock': { useNudgeClock: () => Date.now() },
+    '@/lib/nudge-expiry': { NUDGE_WINDOW_MS: 1800000, nudgeTimeLeft: () => 0, nudgeTimerLabel: () => '0:00' },
     '@/lib/supabase/client': { createClient: () => ({ rpc: async (name, args) => {
       if (name === 'nearby_nudge_friends') return { data: [person.id] }
       calls.push(args)
@@ -408,7 +415,7 @@ test('saved nudge survives failed native dispatch without resending the RPC', as
   view.render('NudgeFriendsScreen')
   await new Promise(setImmediate)
   let tree = view.render('NudgeFriendsScreen')
-  await nodes(tree).find(node => node.type === 'button' && text(node) === 'Nudge').props.onClick()
+  await nodes(tree).find(node => node.props?.['aria-label'] === 'Nudge Sam').props.onClick()
   await new Promise(setImmediate)
   tree = view.render('NudgeFriendsScreen')
   assert.ok(text(tree).includes('Your request is saved, but push dispatch could not be confirmed.'))
@@ -444,6 +451,76 @@ test('profile name saves a trimmed name through the owner RPC and keeps a failed
   assert.ok(text(tree).includes('Taylor'))
   assert.deepEqual(calls, [1, 2].map(() => ({ name: 'save_profile', args: { p_name: 'Taylor', p_adult: true } })))
   assert.deepEqual(events, ['upcatch:native-reload'])
+  view.close()
+})
+
+test('timed nudge cards restore persisted countdowns, block active duplicates and expire on resume', async t => {
+  const now = Date.parse('2026-11-21T10:00:00Z')
+  let clock = now
+  const previousWindow = global.window
+  global.window = { setInterval: () => 1, clearInterval() {}, addEventListener() {}, removeEventListener() {} }
+  t.after(() => { global.window = previousWindow })
+  t.mock.method(Date, 'now', () => clock)
+  const chats = []
+  const createdAt = new Date(now - 5 * 60 * 1000).toISOString()
+  const view = await fixture('components/upcatch/nudge-friends-screen.tsx', {
+    './app-provider': { useUpCatch: () => ({ state: { live: {}, friends: [{ person, status: 'offline' }] }, actions: { openFriendChat: id => chats.push(id) } }) },
+    './use-friend-nudges': { useFriendNudges: () => ({ nudges: [{ id: 'received', sender_id: person.id, sender_name: 'Sam', created_at: createdAt }], sent: [{ id: 'sent', recipient_id: person.id, created_at: createdAt }], loading: false, refresh: async () => {} }) },
+    './use-nudge-clock': { useNudgeClock: () => clock },
+    '@/lib/supabase/client': { createClient: () => ({ rpc: async () => ({ data: [person.id] }) }) },
+  })
+  view.render('NudgeFriendsScreen'); await new Promise(setImmediate)
+  let tree = view.render('NudgeFriendsScreen')
+  const sent = nodes(tree).find(node => node.props?.['aria-label'] === 'Nudge sent to Sam')
+  assert.equal(sent.props.disabled, true)
+  assert.ok(text(tree).includes('Sam nudged you'))
+  assert.equal(nodes(tree).filter(node => node.props?.['aria-label'] === 'Time remaining').length, 2)
+  assert.ok(nodes(tree).filter(node => node.props?.['aria-label'] === 'Time remaining').every(node => text(node) === '25:00'))
+  const received = nodes(tree).find(node => node.props?.['aria-label'] === 'Open chat with Sam')
+  received.props.onClick()
+  assert.deepEqual(chats, [person.id])
+  clock += 26 * 60 * 1000
+  received.props.onClick()
+  assert.deepEqual(chats, [person.id], 'stale expired cards cannot open chat')
+  tree = view.render('NudgeFriendsScreen')
+  assert.equal(nodes(tree).some(node => node.props?.['aria-label'] === 'Open chat with Sam'), false)
+  assert.equal(nodes(tree).find(node => node.props?.['aria-label'] === 'Nudge Sam').props.disabled, false)
+  assert.equal(nodes(tree).some(node => node.props?.['aria-label'] === 'Time remaining'), false)
+  view.close()
+})
+
+test('notification inbox expires only nudges and routes an active row straight to its private chat', async t => {
+  let clock = Date.parse('2026-11-21T10:00:00Z')
+  t.mock.method(Date, 'now', () => clock)
+  const previousWindow = global.window
+  global.window = { setInterval: () => 1, clearInterval() {}, addEventListener() {}, removeEventListener() {} }
+  t.after(() => { global.window = previousWindow })
+  const peer = '11111111-1111-4111-8111-111111111111', chats = []
+  const base = { destination: 'nudges', peer_id: peer, read_at: new Date(clock).toISOString(), body: 'Tap to chat' }
+  const items = [
+    { ...base, id: 'active', title: 'Active friend', created_at: new Date(clock - 60000).toISOString() },
+    { ...base, id: 'expired', title: 'Expired friend', created_at: new Date(clock - 31 * 60000).toISOString() },
+    { ...base, id: 'other', destination: 'map', title: 'Other update', created_at: new Date(clock - 60 * 60000).toISOString() },
+  ]
+  const view = await fixture('components/upcatch/notifications-screen.tsx', {
+    './app-provider': { useUpCatch: () => ({ state: { live: {} }, actions: { openFriendChat: id => chats.push(id) } }) },
+    './use-nudge-clock': { useNudgeClock: () => clock },
+    '@/lib/supabase/client': { createClient: () => ({ from: () => ({ select: () => ({ order: () => ({ limit: async () => ({ data: items }) }) }) }) }) },
+  })
+  view.render('NotificationsScreen'); await new Promise(setImmediate)
+  let tree = view.render('NotificationsScreen')
+  assert.ok(text(tree).includes('Active friend'))
+  assert.ok(!text(tree).includes('Expired friend'))
+  assert.ok(text(tree).includes('Other update'))
+  const active = nodes(tree).find(node => node.type === 'button' && text(node).includes('Active friend'))
+  active.props.onClick(); await new Promise(setImmediate)
+  assert.deepEqual(chats, [peer])
+  clock += 31 * 60000
+  active.props.onClick(); await new Promise(setImmediate)
+  assert.deepEqual(chats, [peer], 'an expired stale row does not navigate')
+  tree = view.render('NotificationsScreen')
+  assert.ok(!text(tree).includes('Active friend'))
+  assert.ok(text(tree).includes('Other update'))
   view.close()
 })
 

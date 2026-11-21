@@ -4,16 +4,25 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export type FriendNudge = { id: string; sender_id: string; sender_name: string; created_at: string }
+export type SentFriendNudge = { id: string; recipient_id: string; created_at: string }
 
 export function useFriendNudges(live: boolean) {
   const [nudges, setNudges] = useState<FriendNudge[]>([])
+  const [sent, setSent] = useState<SentFriendNudge[]>([])
+  const [sentError, setSentError] = useState(false)
   const [loading, setLoading] = useState(live)
   const [error, setError] = useState(false)
   const refresh = useCallback(async () => {
-    if (!live) { setLoading(false); return }
-    const { data, error: requestError } = await createClient().rpc('my_friend_nudges')
+    if (!live) { setNudges([]); setSent([]); setLoading(false); return }
+    const [received, outgoing] = await Promise.all([
+      createClient().rpc('my_friend_nudges'),
+      createClient().rpc('my_sent_friend_nudges'),
+    ])
+    const { data, error: requestError } = received
     if (requestError) setError(true)
     else { setNudges((data ?? []) as FriendNudge[]); setError(false) }
+    if (outgoing.error) setSentError(true)
+    else { setSent((outgoing.data ?? []) as SentFriendNudge[]); setSentError(false) }
     setLoading(false)
   }, [live])
 
@@ -40,5 +49,5 @@ export function useFriendNudges(live: boolean) {
     return true
   }
 
-  return { nudges, loading, error, refresh, dismiss }
+  return { nudges, sent, sentError, loading, error, refresh, dismiss }
 }
